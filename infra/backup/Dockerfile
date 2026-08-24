@@ -2,12 +2,10 @@
 # schedule (see docker-compose.yml — mounts the DB/photos volumes read-only).
 FROM alpine:3.20
 
-RUN apk add --no-cache bash sqlite rclone dcron
+RUN apk add --no-cache bash sqlite rclone
 
 COPY backup.sh /usr/local/bin/backup.sh
-RUN chmod +x /usr/local/bin/backup.sh
+COPY run.sh /usr/local/bin/run.sh
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/run.sh
 
-# Daily at 03:00 UTC, per the plan's recommended cadence.
-RUN echo "0 3 * * * /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
-
-CMD ["crond", "-f", "-d", "8"]
+CMD ["/usr/local/bin/run.sh"]

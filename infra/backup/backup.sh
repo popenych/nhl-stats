@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Phase 5: snapshot the SQLite DB + photos and push to Yandex Disk via rclone.
-# Not wired into docker-compose or run automatically yet — see the plan's
-# Backups section for the intended design (daily cron + debounced on-write
-# trigger, 14 local / 30 remote retention).
+# Snapshots the SQLite DB + photos and pushes them to Yandex Disk via rclone.
+# Run daily by run.sh's sleep loop (see that file for why it's not cron).
+# Requires infra/rclone/rclone.conf to exist (gitignored — copy from
+# rclone.conf.example and fill in your Yandex app password); if it's missing,
+# rclone will fail loudly and run.sh will retry on the next daily tick.
 set -euo pipefail
 
 DB_PATH="${DB_PATH:-/data/db/nhl_stats.db}"
