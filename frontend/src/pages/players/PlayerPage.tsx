@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button, Group, Stack, TextInput, Title } from '@mantine/core'
+import { Button, Group, Paper, Select, Stack, Text, TextInput, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as playersApi from '../../api/players'
+import * as statsApi from '../../api/stats'
 import { useAuth } from '../../auth/auth-context-value'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
+import { StatsSummaryGrid } from '../../components/StatsSummaryGrid'
+import { TrendChart } from '../../components/TrendChart'
 
 export function PlayerPage() {
   const { id } = useParams()
@@ -15,10 +18,32 @@ export function PlayerPage() {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
+  const [opponentId, setOpponentId] = useState<string | null>(null)
 
   const { data: player } = useQuery({
     queryKey: ['player', playerId],
     queryFn: () => playersApi.getPlayer(playerId),
+  })
+
+  const { data: allPlayers } = useQuery({
+    queryKey: ['players'],
+    queryFn: playersApi.listPlayers,
+  })
+
+  const { data: summary } = useQuery({
+    queryKey: ['player-summary', playerId],
+    queryFn: () => statsApi.getPlayerSummary(playerId),
+  })
+
+  const { data: trend } = useQuery({
+    queryKey: ['player-trend', playerId],
+    queryFn: () => statsApi.getTrend({ metric: 'win_pct', x: 'date', playerId }),
+  })
+
+  const { data: h2h } = useQuery({
+    queryKey: ['h2h', playerId, opponentId],
+    queryFn: () => statsApi.getHeadToHead(playerId, Number(opponentId)),
+    enabled: opponentId !== null,
   })
 
   const updateMutation = useMutation({
@@ -36,6 +61,9 @@ export function PlayerPage() {
   if (!player) return null
 
   const canEdit = user?.role === 'admin' || user?.player.id === playerId
+  const opponentOptions = (allPlayers ?? [])
+    .filter((p) => p.id !== playerId)
+    .map((p) => ({ value: String(p.id), label: p.name }))
 
   return (
     <Stack>
@@ -65,6 +93,51 @@ export function PlayerPage() {
           </Button>
         )}
       </Group>
+
+      {summary && (
+        <Paper withBorder p="md">
+          <Title order={4} mb="sm">
+            Stats
+          </Title>
+          <StatsSummaryGrid summary={summary} />
+        </Paper>
+      )}
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          Win % trend
+        </Title>
+        <TrendChart trend={trend} />
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Group justify="space-between" mb="sm">
+          <Title order={4}>Head-to-head</Title>
+          <Select
+            placeholder="Pick an opponent"
+            data={opponentOptions}
+            value={opponentId}
+            onChange={setOpponentId}
+            w={200}
+            searchable
+          />
+        </Group>
+        {!opponentId ? (
+          <Text c="dimmed" size="sm">
+            Pick an opponent to see their record against {player.name}.
+          </Text>
+        ) : !h2h || h2h.games_played === 0 ? (
+          <Text c="dimmed" size="sm">
+            No games played against each other yet.
+          </Text>
+        ) : (
+          <Text>
+            {h2h.player_a.name} {h2h.player_a_wins}-{h2h.player_b_wins}-{h2h.ties}{' '}
+            {h2h.player_b.name} ({h2h.player_a_goals_for}-{h2h.player_b_goals_for} goals)
+          </Text>
+        )}
+      </Paper>
+
       <GamesMiniTable filters={{ player_id: playerId }} />
     </Stack>
   )

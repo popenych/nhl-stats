@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from app.api.routes import auth, games, places, players, seasons, teams, users
+from app.api.routes import auth, games, places, players, seasons, stats, teams, users
 from app.config import settings
 from app.ocr.recognize import get_detector
 
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(places.router)
     app.include_router(seasons.router)
     app.include_router(games.router)
+    app.include_router(stats.router)
 
     Path(settings.photo_storage_dir).mkdir(parents=True, exist_ok=True)
     app.mount("/photos", StaticFiles(directory=settings.photo_storage_dir), name="photos")

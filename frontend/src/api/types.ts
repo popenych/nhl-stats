@@ -141,3 +141,96 @@ export interface ExtractResponse {
   labels_found: number
   labels_expected: number
 }
+
+export type MetricKey =
+  | 'win_pct'
+  | 'goals_for_per_game'
+  | 'goals_against_per_game'
+  | 'shooting_pct'
+  | 'pp_pct'
+  | 'pk_pct'
+  | 'faceoff_pct'
+
+export const METRIC_LABELS: Record<MetricKey, string> = {
+  win_pct: 'W%',
+  goals_for_per_game: 'GF/GP',
+  goals_against_per_game: 'GA/GP',
+  shooting_pct: 'SH%',
+  pp_pct: 'PP%',
+  pk_pct: 'PK%',
+  faceoff_pct: 'FOW%',
+}
+
+export interface StatsSummary {
+  games_played: number
+  wins: number
+  losses: number
+  ties: number
+  win_pct: number
+  goals_for: number
+  goals_against: number
+  goals_for_per_game: number
+  goals_against_per_game: number
+  shots_per_game: number
+  shots_against_per_game: number
+  hits_per_game: number
+  shooting_pct: number
+  passing_pct_avg: number
+  faceoff_pct: number
+  pp_pct: number
+  pk_pct: number
+  shorthanded_goals: number
+  current_streak: string
+  last5: string
+}
+
+export interface PlaceStanding {
+  player: Player
+  games_played: number
+  wins: number
+  losses: number
+  ties: number
+}
+
+export interface PlaceSummary {
+  games_played: number
+  standings: PlaceStanding[]
+}
+
+export interface HeadToHead {
+  player_a: Player
+  player_b: Player
+  games_played: number
+  player_a_wins: number
+  player_b_wins: number
+  ties: number
+  player_a_goals_for: number
+  player_b_goals_for: number
+}
+
+export interface LeaderboardEntry {
+  player: Player
+  games_played: number
+  value: number
+}
+
+export interface LeaderboardResponse {
+  metric: MetricKey
+  entries: LeaderboardEntry[]
+}
+
+export interface TrendPoint {
+  x: string
+  value: number
+}
+
+export interface TrendSeries {
+  player: Player
+  points: TrendPoint[]
+}
+
+export interface TrendResponse {
+  metric: MetricKey
+  x_axis: 'date' | 'games_played'
+  series: TrendSeries[]
+}

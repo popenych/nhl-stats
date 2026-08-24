@@ -1,0 +1,86 @@
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
+
+from app.api.deps import CurrentUser, DbSession
+from app.schemas.stats import (
+    HeadToHeadOut,
+    LeaderboardResponse,
+    MetricKey,
+    PlaceSummary,
+    StatsSummary,
+    TrendResponse,
+)
+from app.services import stats_service
+
+router = APIRouter(prefix="/stats", tags=["stats"])
+
+
+@router.get("/players/{player_id}/summary", response_model=StatsSummary)
+async def get_player_summary(
+    player_id: int,
+    db: DbSession,
+    _user: CurrentUser,
+    season_id: int | None = None,
+) -> object:
+    return await stats_service.player_summary(db, player_id, season_id=season_id)
+
+
+@router.get("/teams/{team_id}/summary", response_model=StatsSummary)
+async def get_team_summary(
+    team_id: int,
+    db: DbSession,
+    _user: CurrentUser,
+    season_id: int | None = None,
+) -> object:
+    return await stats_service.team_summary(db, team_id, season_id=season_id)
+
+
+@router.get("/places/{place_id}/summary", response_model=PlaceSummary)
+async def get_place_summary(
+    place_id: int,
+    db: DbSession,
+    _user: CurrentUser,
+    season_id: int | None = None,
+) -> object:
+    return await stats_service.place_summary(db, place_id, season_id=season_id)
+
+
+@router.get("/head-to-head", response_model=HeadToHeadOut)
+async def get_head_to_head(
+    db: DbSession,
+    _user: CurrentUser,
+    player_a: int = Query(...),
+    player_b: int = Query(...),
+    season_id: int | None = None,
+) -> object:
+    if player_a == player_b:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="player_a and player_b must differ"
+        )
+    return await stats_service.head_to_head(db, player_a, player_b, season_id=season_id)
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(
+    db: DbSession,
+    _user: CurrentUser,
+    metric: MetricKey = "win_pct",
+    season_id: int | None = None,
+) -> object:
+    return await stats_service.leaderboard(db, metric, season_id=season_id)
+
+
+@router.get("/trend", response_model=TrendResponse)
+async def get_trend(
+    db: DbSession,
+    _user: CurrentUser,
+    metric: MetricKey = "win_pct",
+    x: Literal["date", "games_played"] = "date",
+    season_id: int | None = None,
+    player_id: int | None = None,
+    team_id: int | None = None,
+) -> object:
+    return await stats_service.trend(
+        db, metric, x, season_id=season_id, player_id=player_id, team_id=team_id
+    )

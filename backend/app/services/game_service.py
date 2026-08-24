@@ -145,14 +145,33 @@ async def list_games(
         date_to=date_to,
     )
 
-    total = (
-        await db.execute(select(func.count()).select_from(base_query.subquery()))
-    ).scalar_one()
+    total = (await db.execute(select(func.count()).select_from(base_query.subquery()))).scalar_one()
 
     order = Game.date.desc() if sort_desc else Game.date.asc()
-    items_query = base_query.order_by(order, Game.id.desc()).offset(
-        (page - 1) * page_size
-    ).limit(page_size)
+    items_query = (
+        base_query.order_by(order, Game.id.desc()).offset((page - 1) * page_size).limit(page_size)
+    )
     items = (await db.execute(items_query)).scalars().all()
 
     return list(items), total
+
+
+async def list_all_games(
+    db: AsyncSession,
+    *,
+    player_id: int | None = None,
+    team_id: int | None = None,
+    season_id: int | None = None,
+    place_id: int | None = None,
+) -> list[Game]:
+    """Unpaginated, chronological (oldest first) — for stats aggregation,
+    which needs the full matching set rather than a page of it."""
+    query = _filtered_games_query(
+        player_id=player_id,
+        team_id=team_id,
+        season_id=season_id,
+        place_id=place_id,
+        date_from=None,
+        date_to=None,
+    ).order_by(Game.date.asc(), Game.id.asc())
+    return list((await db.execute(query)).scalars().all())
