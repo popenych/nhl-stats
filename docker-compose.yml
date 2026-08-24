@@ -1,0 +1,46 @@
+# Phase 5 deployment compose file — not used for local dev (see README: dev runs
+# the backend via uvicorn and the frontend via `npm run dev` directly on the host).
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - db-data:/data/db
+      - photo-data:/data/photos
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  backup:
+    build: ./infra/backup
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - db-data:/data/db:ro
+      - photo-data:/data/photos:ro
+      - backup-data:/data/backups
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  db-data:
+  photo-data:
+  backup-data:
+  caddy-data:

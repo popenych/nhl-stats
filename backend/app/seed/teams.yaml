@@ -1,0 +1,67 @@
+# The 32 current NHL teams (as of the 2024 Arizona -> Utah relocation).
+# Logo files are not included here — see the plan's note: source crest images
+# manually before relying on any logo_path, don't hardcode an unverified URL.
+- abbreviation: ANA
+  name: Anaheim Ducks
+- abbreviation: BOS
+  name: Boston Bruins
+- abbreviation: BUF
+  name: Buffalo Sabres
+- abbreviation: CGY
+  name: Calgary Flames
+- abbreviation: CAR
+  name: Carolina Hurricanes
+- abbreviation: CHI
+  name: Chicago Blackhawks
+- abbreviation: COL
+  name: Colorado Avalanche
+- abbreviation: CBJ
+  name: Columbus Blue Jackets
+- abbreviation: DAL
+  name: Dallas Stars
+- abbreviation: DET
+  name: Detroit Red Wings
+- abbreviation: EDM
+  name: Edmonton Oilers
+- abbreviation: FLA
+  name: Florida Panthers
+- abbreviation: LAK
+  name: Los Angeles Kings
+- abbreviation: MIN
+  name: Minnesota Wild
+- abbreviation: MTL
+  name: Montreal Canadiens
+- abbreviation: NSH
+  name: Nashville Predators
+- abbreviation: NJD
+  name: New Jersey Devils
+- abbreviation: NYI
+  name: New York Islanders
+- abbreviation: NYR
+  name: New York Rangers
+- abbreviation: OTT
+  name: Ottawa Senators
+- abbreviation: PHI
+  name: Philadelphia Flyers
+- abbreviation: PIT
+  name: Pittsburgh Penguins
+- abbreviation: SJS
+  name: San Jose Sharks
+- abbreviation: SEA
+  name: Seattle Kraken
+- abbreviation: STL
+  name: St. Louis Blues
+- abbreviation: TBL
+  name: Tampa Bay Lightning
+- abbreviation: TOR
+  name: Toronto Maple Leafs
+- abbreviation: UTA
+  name: Utah Hockey Club
+- abbreviation: VAN
+  name: Vancouver Canucks
+- abbreviation: VGK
+  name: Vegas Golden Knights
+- abbreviation: WSH
+  name: Washington Capitals
+- abbreviation: WPG
+  name: Winnipeg Jets

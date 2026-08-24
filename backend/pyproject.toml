@@ -1,0 +1,50 @@
+[project]
+name = "nhl-stats-backend"
+version = "0.1.0"
+description = "Backend for the NHL PlayStation stats tracker"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "sqlalchemy>=2",
+  "alembic",
+  "pydantic",
+  "pydantic-settings",
+  "python-multipart",
+  "pyjwt",
+  "argon2-cffi",
+  "opencv-python-headless",
+  "paddlepaddle",
+  "paddleocr",
+  "pillow",
+  "pyyaml",
+  "aiosqlite",
+  "httpx",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Query"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["app"]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

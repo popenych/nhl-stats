@@ -1,0 +1,29 @@
+name: nhl-stats
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - nodejs=20
+  - fastapi
+  - uvicorn-standard
+  - sqlalchemy>=2
+  - alembic
+  - pydantic
+  - pydantic-settings
+  - python-multipart
+  - pyjwt
+  - argon2-cffi
+  - opencv
+  - pillow
+  - pyyaml
+  - aiosqlite
+  - httpx
+  - pytest
+  - pytest-asyncio
+  - ruff
+  - mypy
+  - pip
+  - pip:
+      # Not on conda-forge for osx-arm64 — installed via pip inside the env.
+      - paddlepaddle
+      - paddleocr

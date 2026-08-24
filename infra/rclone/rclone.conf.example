@@ -1,0 +1,12 @@
+# Copy to infra/rclone/rclone.conf (gitignored) and fill in.
+# Generate a Yandex Disk *app password* (not your main account password) at
+# https://id.yandex.com/security/app-passwords, then:
+#   rclone config create yandex webdav url=https://webdav.yandex.ru vendor=other user=<your-yandex-login> pass=<app-password>
+# which will produce a section like this (with an obscured `pass`):
+
+[yandex]
+type = webdav
+url = https://webdav.yandex.ru
+vendor = other
+user = your-yandex-login
+pass = <obscured-app-password>

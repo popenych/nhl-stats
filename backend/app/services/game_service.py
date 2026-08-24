@@ -1,0 +1,158 @@
+from datetime import date as date_
+
+from sqlalchemy import Select, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.game import Game
+from app.models.game_side import GameSide, Side
+from app.models.user import User, UserRole
+from app.schemas.game import GameCreate, GameSideCreate, GameUpdate
+
+
+class GameNotFoundError(Exception):
+    pass
+
+
+async def get_game(db: AsyncSession, game_id: int) -> Game:
+    # populate_existing: forces a fresh load (incl. nested selectin eager loads
+    # for sides[].player/team) even if this Game is already identity-mapped in
+    # `db` with a partially-loaded `sides` collection — e.g. right after
+    # create_game() constructs it by hand rather than via a query.
+    query = select(Game).where(Game.id == game_id).execution_options(populate_existing=True)
+    game = (await db.execute(query)).scalar_one_or_none()
+    if game is None:
+        raise GameNotFoundError
+    return game
+
+
+def can_edit_game(user: User, game: Game) -> bool:
+    if user.role == UserRole.ADMIN:
+        return True
+    return user.player_id in {side.player_id for side in game.sides}
+
+
+def _apply_side(side: GameSide, data: GameSideCreate) -> None:
+    side.player_id = data.player_id
+    side.team_id = data.team_id
+    side.goals = data.goals
+    side.shots = data.shots
+    side.hits = data.hits
+    side.time_on_attack_seconds = data.time_on_attack_seconds
+    side.passing_pct = data.passing_pct
+    side.faceoffs_won = data.faceoffs_won
+    side.penalty_minutes_seconds = data.penalty_minutes_seconds
+    side.powerplay_goals = data.powerplay_goals
+    side.powerplay_total = data.powerplay_total
+    side.powerplay_minutes_seconds = data.powerplay_minutes_seconds
+    side.shorthanded_goals = data.shorthanded_goals
+
+
+async def create_game(db: AsyncSession, data: GameCreate, created_by_user_id: int) -> Game:
+    game = Game(
+        date=data.date or date_.today(),
+        season_id=data.season_id,
+        place_id=data.place_id,
+        photo_path=data.photo_path,
+        notes=data.notes,
+        created_by_user_id=created_by_user_id,
+    )
+    home = GameSide(side=Side.HOME)
+    away = GameSide(side=Side.AWAY)
+    _apply_side(home, data.home)
+    _apply_side(away, data.away)
+    game.sides = [home, away]
+
+    db.add(game)
+    await db.commit()
+    return await get_game(db, game.id)
+
+
+async def update_game(db: AsyncSession, game: Game, data: GameUpdate) -> Game:
+    if data.date is not None:
+        game.date = data.date
+    if data.season_id is not None:
+        game.season_id = data.season_id
+    if data.place_id is not None:
+        game.place_id = data.place_id
+    if data.photo_path is not None:
+        game.photo_path = data.photo_path
+    if data.notes is not None:
+        game.notes = data.notes
+
+    by_side = {s.side: s for s in game.sides}
+    if data.home is not None:
+        _apply_side(by_side[Side.HOME], data.home)
+    if data.away is not None:
+        _apply_side(by_side[Side.AWAY], data.away)
+
+    await db.commit()
+    return await get_game(db, game.id)
+
+
+async def delete_game(db: AsyncSession, game: Game) -> None:
+    await db.delete(game)
+    await db.commit()
+
+
+def _filtered_games_query(
+    *,
+    player_id: int | None,
+    team_id: int | None,
+    season_id: int | None,
+    place_id: int | None,
+    date_from: date_ | None,
+    date_to: date_ | None,
+) -> Select[tuple[Game]]:
+    query = select(Game)
+    if player_id is not None:
+        query = query.where(
+            Game.id.in_(select(GameSide.game_id).where(GameSide.player_id == player_id))
+        )
+    if team_id is not None:
+        query = query.where(
+            Game.id.in_(select(GameSide.game_id).where(GameSide.team_id == team_id))
+        )
+    if season_id is not None:
+        query = query.where(Game.season_id == season_id)
+    if place_id is not None:
+        query = query.where(Game.place_id == place_id)
+    if date_from is not None:
+        query = query.where(Game.date >= date_from)
+    if date_to is not None:
+        query = query.where(Game.date <= date_to)
+    return query
+
+
+async def list_games(
+    db: AsyncSession,
+    *,
+    player_id: int | None = None,
+    team_id: int | None = None,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    date_from: date_ | None = None,
+    date_to: date_ | None = None,
+    sort_desc: bool = True,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[Game], int]:
+    base_query = _filtered_games_query(
+        player_id=player_id,
+        team_id=team_id,
+        season_id=season_id,
+        place_id=place_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    total = (
+        await db.execute(select(func.count()).select_from(base_query.subquery()))
+    ).scalar_one()
+
+    order = Game.date.desc() if sort_desc else Game.date.asc()
+    items_query = base_query.order_by(order, Game.id.desc()).offset(
+        (page - 1) * page_size
+    ).limit(page_size)
+    items = (await db.execute(items_query)).scalars().all()
+
+    return list(items), total

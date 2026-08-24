@@ -1,0 +1,52 @@
+from app.ocr.parse import parse_field, parse_fraction, parse_int, parse_mmss, parse_pct
+
+
+def test_parse_int_valid() -> None:
+    assert parse_int("18") == 18
+
+
+def test_parse_int_invalid() -> None:
+    assert parse_int("") is None
+    assert parse_int("abc") is None
+
+
+def test_parse_mmss_valid() -> None:
+    assert parse_mmss("06:41") == 401
+    assert parse_mmss("00:00") == 0
+
+
+def test_parse_mmss_rejects_invalid_seconds() -> None:
+    assert parse_mmss("04:60") is None
+    assert parse_mmss("04:99") is None
+
+
+def test_parse_mmss_invalid_format() -> None:
+    assert parse_mmss("abc") is None
+
+
+def test_parse_pct_valid() -> None:
+    assert parse_pct("81.9%") == 81.9
+    assert parse_pct("80%") == 80.0
+
+
+def test_parse_pct_rejects_out_of_range() -> None:
+    assert parse_pct("150%") is None
+
+
+def test_parse_fraction_valid() -> None:
+    assert parse_fraction("2/2") == (2, 2)
+    assert parse_fraction("0 / 2") == (0, 2)
+
+
+def test_parse_fraction_rejects_made_greater_than_total() -> None:
+    assert parse_fraction("3/2") is None
+
+
+def test_parse_field_returns_validity_flag() -> None:
+    value, is_valid = parse_field("int", "18")
+    assert value == 18
+    assert is_valid is True
+
+    value, is_valid = parse_field("int", "")
+    assert value is None
+    assert is_valid is False
