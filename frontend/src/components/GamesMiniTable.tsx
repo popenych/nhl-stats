@@ -4,8 +4,20 @@ import { useQuery } from '@tanstack/react-query'
 
 import * as gamesApi from '../api/games'
 import type { GameFilters } from '../api/games'
+import { myOutcome, teamOutcome } from '../lib/gameOutcome'
+import { GameResultCell } from './GameResultCell'
 
-export function GamesMiniTable({ filters }: { filters: GameFilters }) {
+export function GamesMiniTable({
+  filters,
+  highlightPlayerId,
+  highlightTeamId,
+  opponentId,
+}: {
+  filters: GameFilters
+  highlightPlayerId?: number
+  highlightTeamId?: number
+  opponentId?: number
+}) {
   const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ['games', filters],
@@ -14,7 +26,13 @@ export function GamesMiniTable({ filters }: { filters: GameFilters }) {
 
   if (isLoading) return null
 
-  if (!data || data.items.length === 0) {
+  const items = opponentId
+    ? (data?.items ?? []).filter(
+        (g) => g.home.player.id === opponentId || g.away.player.id === opponentId,
+      )
+    : (data?.items ?? [])
+
+  if (items.length === 0) {
     return (
       <Text c="dimmed" size="sm">
         No games yet.
@@ -28,28 +46,28 @@ export function GamesMiniTable({ filters }: { filters: GameFilters }) {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Date</Table.Th>
-              <Table.Th>Matchup</Table.Th>
-              <Table.Th>Score</Table.Th>
+              <Table.Th>Result</Table.Th>
+              <Table.Th ta="right">Date</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {data.items.map((g) => (
-              <Table.Tr
-                key={g.id}
-                onClick={() => navigate(`/games/${g.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
-                <Table.Td>{g.date}</Table.Td>
-                <Table.Td>
-                  {g.home.player.name} ({g.home.team.abbreviation}) vs {g.away.player.name} (
-                  {g.away.team.abbreviation})
-                </Table.Td>
-                <Table.Td>
-                  {g.home.goals} - {g.away.goals}
-                </Table.Td>
-              </Table.Tr>
-            ))}
+            {items.map((g) => {
+              const outcome = highlightTeamId
+                ? teamOutcome(g, highlightTeamId)
+                : myOutcome(g, highlightPlayerId)
+              return (
+                <Table.Tr
+                  key={g.id}
+                  onClick={() => navigate(`/games/${g.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Table.Td>
+                    <GameResultCell game={g} outcome={outcome} />
+                  </Table.Td>
+                  <Table.Td ta="right">{g.date}</Table.Td>
+                </Table.Tr>
+              )
+            })}
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>

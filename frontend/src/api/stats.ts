@@ -4,6 +4,7 @@ import type {
   LeaderboardResponse,
   MetricKey,
   PlaceSummary,
+  PlayerSummaryRow,
   StatsSummary,
   TrendResponse,
 } from './types'
@@ -31,14 +32,16 @@ export function getPlaceSummary(placeId: number, seasonId?: number) {
 
 export function getHeadToHead(playerA: number, playerB: number, seasonId?: number) {
   return api.get<HeadToHead>(
-    `/stats/head-to-head${qs({ player_a: playerA, player_b: playerB, season_id: seasonId })}`
+    `/stats/head-to-head${qs({ player_a: playerA, player_b: playerB, season_id: seasonId })}`,
   )
 }
 
+export function getAllPlayerSummaries(seasonId?: number) {
+  return api.get<PlayerSummaryRow[]>(`/stats/players-summary${qs({ season_id: seasonId })}`)
+}
+
 export function getLeaderboard(metric: MetricKey, seasonId?: number) {
-  return api.get<LeaderboardResponse>(
-    `/stats/leaderboard${qs({ metric, season_id: seasonId })}`
-  )
+  return api.get<LeaderboardResponse>(`/stats/leaderboard${qs({ metric, season_id: seasonId })}`)
 }
 
 export function getTrend(options: {
@@ -50,6 +53,6 @@ export function getTrend(options: {
 }) {
   const { metric, x, seasonId, playerId, teamId } = options
   return api.get<TrendResponse>(
-    `/stats/trend${qs({ metric, x, season_id: seasonId, player_id: playerId, team_id: teamId })}`
+    `/stats/trend${qs({ metric, x, season_id: seasonId, player_id: playerId, team_id: teamId })}`,
   )
 }

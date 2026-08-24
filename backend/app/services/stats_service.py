@@ -16,6 +16,7 @@ from app.schemas.stats import (
     MetricKey,
     PlaceStanding,
     PlaceSummary,
+    PlayerSummaryRow,
     StatsSummary,
     TrendPoint,
     TrendResponse,
@@ -90,12 +91,18 @@ def summarize(results: list[_Result]) -> StatsSummary:
             goals_against=0,
             goals_for_per_game=0.0,
             goals_against_per_game=0.0,
+            shots_for=0,
             shots_per_game=0.0,
             shots_against_per_game=0.0,
             hits_per_game=0.0,
             shooting_pct=0.0,
             passing_pct_avg=0.0,
+            time_on_attack_avg_seconds=0.0,
+            faceoffs_won=0,
             faceoff_pct=0.0,
+            powerplay_goals=0,
+            powerplay_total=0,
+            powerplay_minutes_avg_seconds=0.0,
             pp_pct=0.0,
             pk_pct=0.0,
             shorthanded_goals=0,
@@ -113,10 +120,12 @@ def summarize(results: list[_Result]) -> StatsSummary:
     shots_against = sum(r.opp.shots for r in results)
     hits_for = sum(r.own.hits for r in results)
     passing_total = sum(r.own.passing_pct for r in results)
+    toa_total = sum(r.own.time_on_attack_seconds for r in results)
     faceoffs_own = sum(r.own.faceoffs_won for r in results)
     faceoffs_opp = sum(r.opp.faceoffs_won for r in results)
     pp_goals = sum(r.own.powerplay_goals for r in results)
     pp_total = sum(r.own.powerplay_total for r in results)
+    pp_minutes_total = sum(r.own.powerplay_minutes_seconds for r in results)
     opp_pp_goals = sum(r.opp.powerplay_goals for r in results)
     opp_pp_total = sum(r.opp.powerplay_total for r in results)
     sh_goals = sum(r.own.shorthanded_goals for r in results)
@@ -133,12 +142,18 @@ def summarize(results: list[_Result]) -> StatsSummary:
         goals_against=goals_against,
         goals_for_per_game=goals_for / gp,
         goals_against_per_game=goals_against / gp,
+        shots_for=shots_for,
         shots_per_game=shots_for / gp,
         shots_against_per_game=shots_against / gp,
         hits_per_game=hits_for / gp,
         shooting_pct=(goals_for / shots_for) if shots_for else 0.0,
         passing_pct_avg=passing_total / gp,
+        time_on_attack_avg_seconds=toa_total / gp,
+        faceoffs_won=faceoffs_own,
         faceoff_pct=(faceoffs_own / faceoffs_total) if faceoffs_total else 0.0,
+        powerplay_goals=pp_goals,
+        powerplay_total=pp_total,
+        powerplay_minutes_avg_seconds=pp_minutes_total / gp,
         pp_pct=(pp_goals / pp_total) if pp_total else 0.0,
         pk_pct=(1 - opp_pp_goals / opp_pp_total) if opp_pp_total else 1.0,
         shorthanded_goals=sh_goals,
@@ -202,10 +217,11 @@ async def head_to_head(
 ) -> HeadToHeadOut:
     games = await list_all_games(db, player_id=player_a_id, season_id=season_id)
     games = [g for g in games if any(s.player_id == player_b_id for s in g.sides)]
-    results = _split_by_player(games, player_a_id)
+    results_a = _split_by_player(games, player_a_id)
+    results_b = _split_by_player(games, player_b_id)
 
-    player_a = results[0].own.player if results else None
-    player_b = results[0].opp.player if results else None
+    player_a = results_a[0].own.player if results_a else None
+    player_b = results_a[0].opp.player if results_a else None
 
     if player_a is None or player_b is None:
         # No shared games — still need PlayerOut for both, fetched directly.
@@ -215,25 +231,27 @@ async def head_to_head(
         assert b_obj is not None
         player_a, player_b = a_obj, b_obj
 
-    a_wins = sum(1 for r in results if _outcome(r) == "W")
-    b_wins = sum(1 for r in results if _outcome(r) == "L")
-    ties = len(results) - a_wins - b_wins
+    a_wins = sum(1 for r in results_a if _outcome(r) == "W")
+    b_wins = sum(1 for r in results_a if _outcome(r) == "L")
+    ties = len(results_a) - a_wins - b_wins
 
     return HeadToHeadOut(
         player_a=PlayerOut.model_validate(player_a),
         player_b=PlayerOut.model_validate(player_b),
-        games_played=len(results),
+        games_played=len(results_a),
         player_a_wins=a_wins,
         player_b_wins=b_wins,
         ties=ties,
-        player_a_goals_for=sum(r.own.goals for r in results),
-        player_b_goals_for=sum(r.opp.goals for r in results),
+        player_a_goals_for=sum(r.own.goals for r in results_a),
+        player_b_goals_for=sum(r.opp.goals for r in results_a),
+        player_a_summary=summarize(results_a),
+        player_b_summary=summarize(results_b),
     )
 
 
-async def leaderboard(
-    db: AsyncSession, metric: MetricKey, *, season_id: int | None = None
-) -> LeaderboardResponse:
+async def _group_all_players(
+    db: AsyncSession, *, season_id: int | None
+) -> tuple[dict[int, list[_Result]], dict[int, Player]]:
     games = await list_all_games(db, season_id=season_id)
 
     by_player: dict[int, list[_Result]] = {}
@@ -252,6 +270,14 @@ async def leaderboard(
             players[p.id] = p
             by_player[p.id] = []
 
+    return by_player, players
+
+
+async def leaderboard(
+    db: AsyncSession, metric: MetricKey, *, season_id: int | None = None
+) -> LeaderboardResponse:
+    by_player, players = await _group_all_players(db, season_id=season_id)
+
     entries = []
     for player_id, results in by_player.items():
         s = summarize(results)
@@ -265,6 +291,22 @@ async def leaderboard(
     entries.sort(key=lambda e: e.value, reverse=True)
 
     return LeaderboardResponse(metric=metric, entries=entries)
+
+
+async def all_player_summaries(
+    db: AsyncSession, *, season_id: int | None = None
+) -> list[PlayerSummaryRow]:
+    """Every player's full StatsSummary in one call — backs the Home page
+    leaderboard table, which shows all the main stats at once rather than
+    one metric at a time behind a selector."""
+    by_player, players = await _group_all_players(db, season_id=season_id)
+
+    rows = [
+        PlayerSummaryRow(player=PlayerOut.model_validate(players[pid]), summary=summarize(results))
+        for pid, results in by_player.items()
+    ]
+    rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
+    return rows
 
 
 async def trend(

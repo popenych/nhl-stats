@@ -39,16 +39,8 @@ export function Login() {
         </Title>
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
-            <TextInput
-              label="Username"
-              required
-              {...form.getInputProps('username')}
-            />
-            <PasswordInput
-              label="Password"
-              required
-              {...form.getInputProps('password')}
-            />
+            <TextInput label="Username" required {...form.getInputProps('username')} />
+            <PasswordInput label="Password" required {...form.getInputProps('password')} />
             {error && <Paper c="red">{error}</Paper>}
             <Button type="submit" loading={submitting}>
               Log in

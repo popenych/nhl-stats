@@ -35,12 +35,18 @@ class StatsSummary(BaseModel):
     goals_against: int
     goals_for_per_game: float
     goals_against_per_game: float
+    shots_for: int
     shots_per_game: float
     shots_against_per_game: float
     hits_per_game: float
     shooting_pct: float
     passing_pct_avg: float
+    time_on_attack_avg_seconds: float
+    faceoffs_won: int
     faceoff_pct: float
+    powerplay_goals: int
+    powerplay_total: int
+    powerplay_minutes_avg_seconds: float
     pp_pct: float
     pk_pct: float
     shorthanded_goals: int
@@ -70,6 +76,11 @@ class HeadToHeadOut(BaseModel):
     ties: int
     player_a_goals_for: int
     player_b_goals_for: int
+    # Full stat breakdowns computed only from the games between these two
+    # players (not each player's overall record) — backs the side-by-side
+    # head-to-head comparison table.
+    player_a_summary: StatsSummary
+    player_b_summary: StatsSummary
 
 
 class LeaderboardEntry(BaseModel):
@@ -81,6 +92,11 @@ class LeaderboardEntry(BaseModel):
 class LeaderboardResponse(BaseModel):
     metric: MetricKey
     entries: list[LeaderboardEntry]
+
+
+class PlayerSummaryRow(BaseModel):
+    player: PlayerOut
+    summary: StatsSummary
 
 
 class TrendPoint(BaseModel):

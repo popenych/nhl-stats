@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import * as placesApi from '../../api/places'
 import * as statsApi from '../../api/stats'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
+import { formatRecord } from '../../lib/record'
 
 export function PlacePage() {
   const { id } = useParams()
@@ -51,9 +52,7 @@ export function PlacePage() {
                       </Text>
                     </Table.Td>
                     <Table.Td>{s.games_played}</Table.Td>
-                    <Table.Td>
-                      {s.wins}-{s.losses}-{s.ties}
-                    </Table.Td>
+                    <Table.Td>{formatRecord(s.wins, s.losses, s.ties)}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

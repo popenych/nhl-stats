@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Group, Image, Paper, SimpleGrid, Stack, Textarea, Title } from '@mantine/core'
+import {
+  Alert,
+  Button,
+  Group,
+  Image,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Textarea,
+  Title,
+} from '@mantine/core'
 import { DateInput } from '@mantine/dates'
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone'
 import { useForm } from '@mantine/form'
@@ -127,8 +137,7 @@ export function GameForm({
       applyTeamGuess('home', res.home_team_guess)
       applyTeamGuess('away', res.away_team_guess)
     },
-    onError: () =>
-      notifications.show({ message: 'Photo upload / reading failed', color: 'red' }),
+    onError: () => notifications.show({ message: 'Photo upload / reading failed', color: 'red' }),
   })
 
   function applyTeamGuess(

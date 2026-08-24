@@ -1,4 +1,5 @@
-import { api, ApiError } from '../lib/apiClient'
+import { api } from '../lib/apiClient'
+import { photoUrl, postPhoto } from '../lib/photo'
 import type {
   ExtractResponse,
   Game,
@@ -44,21 +45,6 @@ export function deleteGame(id: number) {
   return api.delete<void>(`/games/${id}`)
 }
 
-async function postPhoto<T>(path: string, file: File): Promise<T> {
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await fetch(`/api${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    throw new ApiError(res.status, body?.detail ?? res.statusText)
-  }
-  return res.json()
-}
-
 /** Saves the photo and, separately, uploads-only (no OCR) — used when
  * re-extraction isn't wanted (e.g. edit flow keeping the same photo). */
 export function uploadGamePhoto(file: File): Promise<{ photo_path: string }> {
@@ -72,6 +58,4 @@ export function extractGamePhoto(file: File): Promise<ExtractResponse> {
   return postPhoto('/games/extract', file)
 }
 
-export function photoUrl(photoPath: string) {
-  return `/api/photos/${photoPath}`
-}
+export { photoUrl }

@@ -9,7 +9,10 @@ import type { MetricKey } from '../api/types'
 import { METRIC_LABELS } from '../api/types'
 import { useAuth } from '../auth/auth-context-value'
 import { GamesMiniTable } from '../components/GamesMiniTable'
+import { Last5 } from '../components/Last5'
 import { TrendChart } from '../components/TrendChart'
+import { formatMMSS } from '../lib/time'
+import { formatRecord } from '../lib/record'
 
 const METRIC_OPTIONS = (Object.keys(METRIC_LABELS) as MetricKey[]).map((key) => ({
   value: key,
@@ -34,9 +37,14 @@ export function Home() {
 
   const seasonIdNum = seasonId ? Number(seasonId) : undefined
 
-  const { data: leaderboard } = useQuery({
-    queryKey: ['leaderboard', metric, seasonIdNum],
-    queryFn: () => statsApi.getLeaderboard(metric, seasonIdNum),
+  const { data: standings } = useQuery({
+    queryKey: ['players-summary', seasonIdNum],
+    queryFn: () => statsApi.getAllPlayerSummaries(seasonIdNum),
+  })
+
+  const { data: allTimeStandings } = useQuery({
+    queryKey: ['players-summary', 'all-time'],
+    queryFn: () => statsApi.getAllPlayerSummaries(undefined),
   })
 
   const { data: trend } = useQuery({
@@ -62,48 +70,91 @@ export function Home() {
         />
       </Group>
 
+      {allTimeStandings && allTimeStandings.length > 0 && (
+        <Paper withBorder p="md">
+          <Title order={4} mb="sm">
+            All-time
+          </Title>
+          <Table.ScrollContainer minWidth={280}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Player</Table.Th>
+                  <Table.Th>Record</Table.Th>
+                  <Table.Th>W%</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {allTimeStandings.map((row) => (
+                  <Table.Tr key={row.player.id}>
+                    <Table.Td>
+                      <Text component={Link} to={`/players/${row.player.id}`}>
+                        {row.player.name}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      {formatRecord(row.summary.wins, row.summary.losses, row.summary.ties)}
+                    </Table.Td>
+                    <Table.Td>{(row.summary.win_pct * 100).toFixed(1)}%</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Paper>
+      )}
+
       <Paper withBorder p="md">
-        <Group justify="space-between" mb="sm">
-          <Title order={4}>Leaderboard</Title>
-          <Select
-            data={METRIC_OPTIONS}
-            value={metric}
-            onChange={(v) => v && setMetric(v as MetricKey)}
-            w={140}
-            allowDeselect={false}
-          />
-        </Group>
-        {!leaderboard || leaderboard.entries.length === 0 ? (
+        <Title order={4} mb="sm">
+          Leaderboard
+        </Title>
+        {!standings || standings.length === 0 ? (
           <Text c="dimmed" size="sm">
             No games yet.
           </Text>
         ) : (
-          <Table.ScrollContainer minWidth={360}>
+          <Table.ScrollContainer minWidth={860}>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Player</Table.Th>
                   <Table.Th>GP</Table.Th>
-                  <Table.Th>{METRIC_LABELS[metric]}</Table.Th>
+                  <Table.Th>W%</Table.Th>
+                  <Table.Th>Record</Table.Th>
+                  <Table.Th>GF-GA</Table.Th>
+                  <Table.Th>SH%</Table.Th>
+                  <Table.Th>PP%</Table.Th>
+                  <Table.Th>PK%</Table.Th>
+                  <Table.Th>FOW%</Table.Th>
+                  <Table.Th>TOA avg</Table.Th>
+                  <Table.Th>Last 5</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {leaderboard.entries.map((e) => (
-                  <Table.Tr key={e.player.id}>
+                {standings.map((row) => (
+                  <Table.Tr key={row.player.id}>
                     <Table.Td>
-                      <Text component={Link} to={`/players/${e.player.id}`}>
-                        {e.player.name}
+                      <Text component={Link} to={`/players/${row.player.id}`}>
+                        {row.player.name}
                       </Text>
                     </Table.Td>
-                    <Table.Td>{e.games_played}</Table.Td>
+                    <Table.Td>{row.summary.games_played}</Table.Td>
+                    <Table.Td>{(row.summary.win_pct * 100).toFixed(1)}%</Table.Td>
                     <Table.Td>
-                      {metric === 'win_pct' ||
-                      metric === 'shooting_pct' ||
-                      metric === 'pp_pct' ||
-                      metric === 'pk_pct' ||
-                      metric === 'faceoff_pct'
-                        ? `${(e.value * 100).toFixed(0)}%`
-                        : e.value.toFixed(2)}
+                      {formatRecord(row.summary.wins, row.summary.losses, row.summary.ties)}
+                    </Table.Td>
+                    <Table.Td>
+                      {row.summary.goals_for}-{row.summary.goals_against}
+                    </Table.Td>
+                    <Table.Td>{(row.summary.shooting_pct * 100).toFixed(1)}%</Table.Td>
+                    <Table.Td>{(row.summary.pp_pct * 100).toFixed(1)}%</Table.Td>
+                    <Table.Td>{(row.summary.pk_pct * 100).toFixed(1)}%</Table.Td>
+                    <Table.Td>{(row.summary.faceoff_pct * 100).toFixed(1)}%</Table.Td>
+                    <Table.Td>
+                      {formatMMSS(Math.round(row.summary.time_on_attack_avg_seconds))}
+                    </Table.Td>
+                    <Table.Td>
+                      <Last5 value={row.summary.last5} />
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -139,9 +190,12 @@ export function Home() {
 
       <Paper withBorder p="md">
         <Title order={4} mb="sm">
-          Recent games
+          Your recent games
         </Title>
-        <GamesMiniTable filters={{ season_id: seasonIdNum, page_size: 10 }} />
+        <GamesMiniTable
+          filters={{ player_id: user?.player.id, season_id: seasonIdNum, page_size: 10 }}
+          highlightPlayerId={user?.player.id}
+        />
       </Paper>
     </Stack>
   )

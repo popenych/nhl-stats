@@ -8,6 +8,7 @@ from app.schemas.stats import (
     LeaderboardResponse,
     MetricKey,
     PlaceSummary,
+    PlayerSummaryRow,
     StatsSummary,
     TrendResponse,
 )
@@ -59,6 +60,15 @@ async def get_head_to_head(
             status_code=status.HTTP_400_BAD_REQUEST, detail="player_a and player_b must differ"
         )
     return await stats_service.head_to_head(db, player_a, player_b, season_id=season_id)
+
+
+@router.get("/players-summary", response_model=list[PlayerSummaryRow])
+async def get_all_player_summaries(
+    db: DbSession,
+    _user: CurrentUser,
+    season_id: int | None = None,
+) -> object:
+    return await stats_service.all_player_summaries(db, season_id=season_id)
 
 
 @router.get("/leaderboard", response_model=LeaderboardResponse)

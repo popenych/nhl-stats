@@ -18,15 +18,28 @@ export function TrendChart({ trend }: { trend: TrendResponse | undefined }) {
 
   const xValues = Array.from(new Set(trend.series.flatMap((s) => s.points.map((p) => p.x))))
   xValues.sort((a, b) =>
-    trend.x_axis === 'games_played' ? Number(a) - Number(b) : a.localeCompare(b)
+    trend.x_axis === 'games_played' ? Number(a) - Number(b) : a.localeCompare(b),
   )
+  const maxX = xValues[xValues.length - 1]
+
+  // By date, players who haven't played as recently as others would
+  // otherwise have their line stop short — carry each player's last value
+  // forward to the latest date on the chart so lines end level and are easy
+  // to compare. "Games played" has no such fix: stopping early there is the
+  // real signal (fewer games logged), not a display artifact.
+  const seriesPoints = trend.series.map((s) => {
+    if (trend.x_axis !== 'date' || s.points.length === 0) return s.points
+    const last = s.points[s.points.length - 1]
+    if (last.x === maxX) return s.points
+    return [...s.points, { x: maxX, value: last.value }]
+  })
 
   const data = xValues.map((x) => {
     const row: Record<string, string | number | null> = { x }
-    for (const s of trend.series) {
-      const point = s.points.find((p) => p.x === x)
+    trend.series.forEach((s, i) => {
+      const point = seriesPoints[i].find((p) => p.x === x)
       row[s.player.name] = point ? point.value : null
-    }
+    })
     return row
   })
 
@@ -47,7 +60,7 @@ export function TrendChart({ trend }: { trend: TrendResponse | undefined }) {
       connectNulls
       withLegend
       withDots={data.length <= 30}
-      valueFormatter={(v) => (isPct ? `${(v * 100).toFixed(0)}%` : v.toFixed(2))}
+      valueFormatter={(v) => (isPct ? `${(v * 100).toFixed(1)}%` : v.toFixed(2))}
       xAxisLabel={trend.x_axis === 'games_played' ? 'Games played' : 'Date'}
     />
   )

@@ -9,6 +9,7 @@ import * as placesApi from '../../api/places'
 import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as teamsApi from '../../api/teams'
+import { GameResultCell } from '../../components/GameResultCell'
 
 export function GamesList() {
   const navigate = useNavigate()
@@ -88,13 +89,12 @@ export function GamesList() {
       </SimpleGrid>
 
       <Paper withBorder p="md">
-        <Table.ScrollContainer minWidth={520}>
+        <Table.ScrollContainer minWidth={640}>
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Date</Table.Th>
-                <Table.Th>Matchup</Table.Th>
-                <Table.Th>Score</Table.Th>
+                <Table.Th>Result</Table.Th>
                 <Table.Th>Season</Table.Th>
                 <Table.Th>Place</Table.Th>
               </Table.Tr>
@@ -108,11 +108,7 @@ export function GamesList() {
                 >
                   <Table.Td>{g.date}</Table.Td>
                   <Table.Td>
-                    {g.home.player.name} ({g.home.team.abbreviation}) vs {g.away.player.name} (
-                    {g.away.team.abbreviation})
-                  </Table.Td>
-                  <Table.Td>
-                    {g.home.goals} - {g.away.goals}
+                    <GameResultCell game={g} />
                   </Table.Td>
                   <Table.Td>{g.season.name}</Table.Td>
                   <Table.Td>{g.place.name}</Table.Td>
@@ -120,7 +116,7 @@ export function GamesList() {
               ))}
               {!isLoading && data?.items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={5}>No games yet.</Table.Td>
+                  <Table.Td colSpan={4}>No games yet.</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>

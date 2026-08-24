@@ -1,23 +1,96 @@
+import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Group, Image, Paper, Table, Text, Title } from '@mantine/core'
+import { Button, Group, Image, Paper, Stack, Table, Text, Title } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
+import {
+  IconAlertTriangle,
+  IconBolt,
+  IconClock,
+  IconDisc,
+  IconFlag,
+  IconPercentage,
+  IconScoreboard,
+  IconShieldCheck,
+  IconStopwatch,
+  IconTarget,
+} from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as gamesApi from '../../api/games'
+import type { Team } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
+import { TeamLogo } from '../../components/TeamLogo'
 import { formatMMSS } from '../../lib/time'
 
-const STAT_ROWS: { label: string; format: (v: number) => string; key: string }[] = [
-  { label: 'Total shots', key: 'shots', format: String },
-  { label: 'Hits', key: 'hits', format: String },
-  { label: 'Time on attack', key: 'time_on_attack_seconds', format: formatMMSS },
-  { label: 'Passing', key: 'passing_pct', format: (v) => `${v}%` },
-  { label: 'Faceoffs won', key: 'faceoffs_won', format: String },
-  { label: 'Penalty minutes', key: 'penalty_minutes_seconds', format: formatMMSS },
-  { label: 'Powerplay minutes', key: 'powerplay_minutes_seconds', format: formatMMSS },
-  { label: 'Shorthanded goals', key: 'shorthanded_goals', format: String },
+const STAT_ROWS: {
+  label: string
+  icon: ReactNode
+  format: (v: number) => string
+  key: string
+}[] = [
+  { label: 'Total shots', icon: <IconTarget size={14} />, key: 'shots', format: String },
+  { label: 'Hits', icon: <IconBolt size={14} />, key: 'hits', format: String },
+  {
+    label: 'Time on attack',
+    icon: <IconStopwatch size={14} />,
+    key: 'time_on_attack_seconds',
+    format: formatMMSS,
+  },
+  {
+    label: 'Passing',
+    icon: <IconPercentage size={14} />,
+    key: 'passing_pct',
+    format: (v) => `${v}%`,
+  },
+  { label: 'Faceoffs won', icon: <IconDisc size={14} />, key: 'faceoffs_won', format: String },
+  {
+    label: 'Penalty minutes',
+    icon: <IconAlertTriangle size={14} />,
+    key: 'penalty_minutes_seconds',
+    format: formatMMSS,
+  },
+  {
+    label: 'Powerplay minutes',
+    icon: <IconClock size={14} />,
+    key: 'powerplay_minutes_seconds',
+    format: formatMMSS,
+  },
+  {
+    label: 'Shorthanded goals',
+    icon: <IconShieldCheck size={14} />,
+    key: 'shorthanded_goals',
+    format: String,
+  },
 ]
+
+function RowLabel({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <Group gap={4} justify="center" wrap="nowrap">
+      {icon}
+      <Text size="sm" c="dimmed">
+        {text}
+      </Text>
+    </Group>
+  )
+}
+
+// A dedicated, full-width matchup header instead of cramming team+player
+// into a table header cell — a long player name has room to wrap onto a
+// second centered line without colliding with the logo next to it.
+function SideCard({ player, team }: { player: string; team: Team }) {
+  return (
+    <Stack align="center" gap={2} style={{ flex: 1, minWidth: 0 }}>
+      <TeamLogo team={team} size={36} />
+      <Text fw={700} size="sm" ta="center">
+        {player}
+      </Text>
+      <Text size="xs" c="dimmed">
+        {team.abbreviation}
+      </Text>
+    </Stack>
+  )
+}
 
 export function GameDetail() {
   const { id } = useParams()
@@ -62,7 +135,7 @@ export function GameDetail() {
     <>
       <Group justify="space-between" mb="md">
         <Title order={2}>
-          {game.home.player.name} vs {game.away.player.name} — {game.date}
+          {game.away.player.name} vs {game.home.player.name} — {game.date}
         </Title>
         {canEdit && (
           <Group>
@@ -86,52 +159,51 @@ export function GameDetail() {
         />
 
         <Paper withBorder p="md" style={{ flex: 1, minWidth: 280 }}>
-          <Table.ScrollContainer minWidth={340}>
+          <Group justify="center" gap="md" wrap="nowrap" mb="md">
+            <SideCard player={game.away.player.name} team={game.away.team} />
+            <Text size="xl" fw={900} c="dimmed">
+              {game.away.goals}-{game.home.goals}
+            </Text>
+            <SideCard player={game.home.player.name} team={game.home.team} />
+          </Group>
+
+          <Table.ScrollContainer minWidth={300}>
             <Table>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>
-                  {game.home.player.name} ({game.home.team.abbreviation})
-                </Table.Th>
-                <Table.Th ta="center">Score</Table.Th>
-                <Table.Th ta="right">
-                  {game.away.player.name} ({game.away.team.abbreviation})
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              <Table.Tr>
-                <Table.Td fw={700}>{game.home.goals}</Table.Td>
-                <Table.Td ta="center">Goals</Table.Td>
-                <Table.Td fw={700} ta="right">
-                  {game.away.goals}
-                </Table.Td>
-              </Table.Tr>
-              {STAT_ROWS.map((row) => (
-                <Table.Tr key={row.key}>
+              <Table.Tbody>
+                <Table.Tr>
+                  <Table.Td fw={700}>{game.away.goals}</Table.Td>
                   <Table.Td>
-                    {row.format(game.home[row.key as keyof typeof game.home] as number)}
+                    <RowLabel icon={<IconScoreboard size={14} />} text="Goals" />
                   </Table.Td>
-                  <Table.Td ta="center" c="dimmed">
-                    {row.label}
-                  </Table.Td>
-                  <Table.Td ta="right">
-                    {row.format(game.away[row.key as keyof typeof game.away] as number)}
+                  <Table.Td fw={700} ta="right">
+                    {game.home.goals}
                   </Table.Td>
                 </Table.Tr>
-              ))}
-              <Table.Tr>
-                <Table.Td>
-                  {game.home.powerplay_goals}/{game.home.powerplay_total}
-                </Table.Td>
-                <Table.Td ta="center" c="dimmed">
-                  Powerplays
-                </Table.Td>
-                <Table.Td ta="right">
-                  {game.away.powerplay_goals}/{game.away.powerplay_total}
-                </Table.Td>
-              </Table.Tr>
-            </Table.Tbody>
+                {STAT_ROWS.map((row) => (
+                  <Table.Tr key={row.key}>
+                    <Table.Td>
+                      {row.format(game.away[row.key as keyof typeof game.away] as number)}
+                    </Table.Td>
+                    <Table.Td>
+                      <RowLabel icon={row.icon} text={row.label} />
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      {row.format(game.home[row.key as keyof typeof game.home] as number)}
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+                <Table.Tr>
+                  <Table.Td>
+                    {game.away.powerplay_goals}/{game.away.powerplay_total}
+                  </Table.Td>
+                  <Table.Td>
+                    <RowLabel icon={<IconFlag size={14} />} text="Powerplays" />
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    {game.home.powerplay_goals}/{game.home.powerplay_total}
+                  </Table.Td>
+                </Table.Tr>
+              </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
           <Text size="sm" c="dimmed" mt="sm">

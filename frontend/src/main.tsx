@@ -11,6 +11,7 @@ import '@mantine/dates/styles.css'
 import '@mantine/dropzone/styles.css'
 import '@mantine/notifications/styles.css'
 import '@mantine/charts/styles.css'
+import './index.css'
 
 import { AuthProvider } from './auth/AuthContext.tsx'
 import App from './App.tsx'

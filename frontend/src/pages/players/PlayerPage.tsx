@@ -8,6 +8,7 @@ import * as playersApi from '../../api/players'
 import * as statsApi from '../../api/stats'
 import { useAuth } from '../../auth/auth-context-value'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
+import { HeadToHeadTable } from '../../components/HeadToHeadTable'
 import { StatsSummaryGrid } from '../../components/StatsSummaryGrid'
 import { TrendChart } from '../../components/TrendChart'
 
@@ -64,6 +65,7 @@ export function PlayerPage() {
   const opponentOptions = (allPlayers ?? [])
     .filter((p) => p.id !== playerId)
     .map((p) => ({ value: String(p.id), label: p.name }))
+  const opponentName = (allPlayers ?? []).find((p) => String(p.id) === opponentId)?.name
 
   return (
     <Stack>
@@ -131,14 +133,20 @@ export function PlayerPage() {
             No games played against each other yet.
           </Text>
         ) : (
-          <Text>
-            {h2h.player_a.name} {h2h.player_a_wins}-{h2h.player_b_wins}-{h2h.ties}{' '}
-            {h2h.player_b.name} ({h2h.player_a_goals_for}-{h2h.player_b_goals_for} goals)
-          </Text>
+          <HeadToHeadTable h2h={h2h} />
         )}
       </Paper>
 
-      <GamesMiniTable filters={{ player_id: playerId }} />
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          {opponentId ? `Games vs ${opponentName ?? ''}` : 'Recent games'}
+        </Title>
+        <GamesMiniTable
+          filters={{ player_id: playerId }}
+          highlightPlayerId={playerId}
+          opponentId={opponentId ? Number(opponentId) : undefined}
+        />
+      </Paper>
     </Stack>
   )
 }

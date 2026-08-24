@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models.team import Team
 from app.schemas.team import TeamCreate, TeamOut, TeamUpdate
+from app.services.photo_service import save_photo
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -55,6 +56,18 @@ async def update_team(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Abbreviation already in use"
         ) from exc
+    return team
+
+
+@router.post("/{team_id}/logo", response_model=TeamOut)
+async def upload_team_logo(
+    team_id: int, db: DbSession, _admin: AdminUser, file: UploadFile = File(...)
+) -> object:
+    team = await db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+    team.logo_path = await save_photo(file, "teams")
+    await db.commit()
     return team
 
 

@@ -153,6 +153,11 @@ async def test_player_summary_computes_record_and_rates(db: AsyncSession, scenar
     assert summary.pk_pct == pytest.approx(0.5)
     assert summary.current_streak == "L1"
     assert summary.last5 == "LTW"
+    assert summary.shots_for == 21
+    assert summary.faceoffs_won == 11
+    assert summary.time_on_attack_avg_seconds == pytest.approx(300.0)
+    assert summary.powerplay_goals == 1
+    assert summary.powerplay_total == 3
 
 
 async def test_player_summary_empty_when_no_games(db: AsyncSession, scenario: dict) -> None:
@@ -161,6 +166,21 @@ async def test_player_summary_empty_when_no_games(db: AsyncSession, scenario: di
     assert summary.games_played == 0
     assert summary.win_pct == 0.0
     assert summary.pk_pct == 0.0
+
+
+async def test_all_player_summaries_returns_every_player_with_full_stats(
+    db: AsyncSession, scenario: dict
+) -> None:
+    rows = await stats_service.all_player_summaries(db)
+
+    by_player = {r.player.id: r.summary for r in rows}
+    assert set(by_player) == {scenario["alex_id"], scenario["friend_id"]}
+    assert by_player[scenario["alex_id"]].games_played == 3
+    assert by_player[scenario["alex_id"]].win_pct == pytest.approx(1 / 3)
+    # sorted by win_pct descending; both are tied here, so just check ordering is stable/valid
+    assert [r.summary.win_pct for r in rows] == sorted(
+        (r.summary.win_pct for r in rows), reverse=True
+    )
 
 
 async def test_head_to_head(db: AsyncSession, scenario: dict) -> None:
@@ -172,6 +192,15 @@ async def test_head_to_head(db: AsyncSession, scenario: dict) -> None:
     assert h2h.ties == 1
     assert h2h.player_a_goals_for == 6
     assert h2h.player_b_goals_for == 7
+
+    # Both summaries are scoped to just these 3 shared games — since alex and
+    # friend only ever played each other in this scenario, they match each
+    # player's overall summary from test_player_summary_computes_record_and_rates.
+    assert h2h.player_a_summary.wins == 1
+    assert h2h.player_a_summary.shots_for == 21
+    assert h2h.player_a_summary.faceoffs_won == 11
+    assert h2h.player_b_summary.goals_for == 7
+    assert h2h.player_b_summary.goals_against == 6
 
 
 async def test_leaderboard_sorts_descending(db: AsyncSession, scenario: dict) -> None:

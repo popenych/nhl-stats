@@ -1,5 +1,16 @@
 import type { ReactNode } from 'react'
-import { Fieldset, Grid, Group, NumberInput, Select, Stack, Text, TextInput, Title } from '@mantine/core'
+import {
+  Divider,
+  Fieldset,
+  Group,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core'
 import type { UseFormReturnType } from '@mantine/form'
 import {
   IconAlertTriangle,
@@ -17,21 +28,14 @@ import {
 } from '@tabler/icons-react'
 
 import type { Player, Team } from '../../api/types'
+import { TeamLogo } from '../../components/TeamLogo'
 import type { GameFormValues } from './gameFormTypes'
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
-function RowLabel({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <Group gap={4} justify="center" wrap="nowrap">
-      {icon}
-      <Text size="sm" fw={500} ta="center">
-        {text}
-      </Text>
-    </Group>
-  )
-}
-
+// Label sits on its own full-width row, with the away/home inputs in a row
+// below it — a narrow phone screen doesn't have room for a three-column
+// away|label|home layout without the label text colliding with the inputs.
 function StatRow({
   icon,
   label,
@@ -44,13 +48,18 @@ function StatRow({
   home: ReactNode
 }) {
   return (
-    <Grid align="center" gap="xs">
-      <Grid.Col span={5}>{away}</Grid.Col>
-      <Grid.Col span={2}>
-        <RowLabel icon={icon} text={label} />
-      </Grid.Col>
-      <Grid.Col span={5}>{home}</Grid.Col>
-    </Grid>
+    <Stack gap={4}>
+      <Group gap={4} justify="center">
+        {icon}
+        <Text size="sm" fw={500} c="dimmed">
+          {label}
+        </Text>
+      </Group>
+      <SimpleGrid cols={2} spacing="xs">
+        {away}
+        {home}
+      </SimpleGrid>
+    </Stack>
   )
 }
 
@@ -81,22 +90,20 @@ export function GameStatsGrid({
   const awayConf = (key: string) => confidence?.away?.[key]
   const homeConf = (key: string) => confidence?.home?.[key]
 
+  const awayTeam = teams.find((t) => String(t.id) === form.values.away.teamId)
+  const homeTeam = teams.find((t) => String(t.id) === form.values.home.teamId)
+
   return (
     <Fieldset legend={<Title order={4}>Stats</Title>}>
       <Stack gap="sm">
-        <Grid gap="xs">
-          <Grid.Col span={5}>
-            <Text size="xs" c="dimmed" fw={700} ta="center">
-              AWAY
-            </Text>
-          </Grid.Col>
-          <Grid.Col span={2} />
-          <Grid.Col span={5}>
-            <Text size="xs" c="dimmed" fw={700} ta="center">
-              HOME
-            </Text>
-          </Grid.Col>
-        </Grid>
+        <SimpleGrid cols={2} spacing="xs">
+          <Text size="xs" c="dimmed" fw={700} ta="center">
+            AWAY
+          </Text>
+          <Text size="xs" c="dimmed" fw={700} ta="center">
+            HOME
+          </Text>
+        </SimpleGrid>
 
         <StatRow
           icon={<IconUser size={14} />}
@@ -128,6 +135,7 @@ export function GameStatsGrid({
                 data={teamOptions}
                 required
                 searchable
+                leftSection={awayTeam ? <TeamLogo team={awayTeam} size={20} /> : undefined}
                 {...form.getInputProps('away.teamId')}
               />
               {teamHints?.away && (
@@ -143,6 +151,7 @@ export function GameStatsGrid({
                 data={teamOptions}
                 required
                 searchable
+                leftSection={homeTeam ? <TeamLogo team={homeTeam} size={20} /> : undefined}
                 {...form.getInputProps('home.teamId')}
               />
               {teamHints?.home && (
@@ -153,6 +162,8 @@ export function GameStatsGrid({
             </Stack>
           }
         />
+
+        <Divider />
 
         <StatRow
           icon={<IconScoreboard size={14} />}

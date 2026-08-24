@@ -171,12 +171,18 @@ export interface StatsSummary {
   goals_against: number
   goals_for_per_game: number
   goals_against_per_game: number
+  shots_for: number
   shots_per_game: number
   shots_against_per_game: number
   hits_per_game: number
   shooting_pct: number
   passing_pct_avg: number
+  time_on_attack_avg_seconds: number
+  faceoffs_won: number
   faceoff_pct: number
+  powerplay_goals: number
+  powerplay_total: number
+  powerplay_minutes_avg_seconds: number
   pp_pct: number
   pk_pct: number
   shorthanded_goals: number
@@ -206,6 +212,8 @@ export interface HeadToHead {
   ties: number
   player_a_goals_for: number
   player_b_goals_for: number
+  player_a_summary: StatsSummary
+  player_b_summary: StatsSummary
 }
 
 export interface LeaderboardEntry {
@@ -217,6 +225,11 @@ export interface LeaderboardEntry {
 export interface LeaderboardResponse {
   metric: MetricKey
   entries: LeaderboardEntry[]
+}
+
+export interface PlayerSummaryRow {
+  player: Player
+  summary: StatsSummary
 }
 
 export interface TrendPoint {
