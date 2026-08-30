@@ -18,7 +18,7 @@ async def list_seasons(db: DbSession, _user: CurrentUser) -> object:
 @router.post("", response_model=SeasonOut, status_code=status.HTTP_201_CREATED)
 async def create_season(data: SeasonCreate, db: DbSession, _user: CurrentUser) -> object:
     max_sort_order = (await db.execute(select(func.max(Season.sort_order)))).scalar_one()
-    season = Season(name=data.name, sort_order=(max_sort_order or 0) + 1)
+    season = Season(name=data.name, sort_order=(max_sort_order or 0) + 1, icon=data.icon)
     db.add(season)
     try:
         await db.commit()
@@ -41,6 +41,8 @@ async def update_season(
         season.name = data.name
     if data.sort_order is not None:
         season.sort_order = data.sort_order
+    if data.icon is not None:
+        season.icon = data.icon
     await db.commit()
     return season
 

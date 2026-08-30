@@ -10,3 +10,4 @@ class Season(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
     sort_order: Mapped[int]
+    icon: Mapped[str | None] = mapped_column(default=None)

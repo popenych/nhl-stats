@@ -78,14 +78,16 @@ function RowLabel({ icon, text }: { icon: ReactNode; text: string }) {
 // A dedicated, full-width matchup header instead of cramming team+player
 // into a table header cell — a long player name has room to wrap onto a
 // second centered line without colliding with the logo next to it.
-function SideCard({ player, team }: { player: string; team: Team }) {
+function SideCard({ playerId, player, team }: { playerId: number; player: string; team: Team }) {
   return (
     <Stack align="center" gap={2} style={{ flex: 1, minWidth: 0 }}>
-      <TeamLogo team={team} size={36} />
-      <Text fw={700} size="sm" ta="center">
+      <Link to={`/teams/${team.id}`}>
+        <TeamLogo team={team} size={36} />
+      </Link>
+      <Text component={Link} to={`/players/${playerId}`} fw={700} size="sm" ta="center">
         {player}
       </Text>
-      <Text size="xs" c="dimmed">
+      <Text component={Link} to={`/teams/${team.id}`} size="xs" c="dimmed">
         {team.abbreviation}
       </Text>
     </Stack>
@@ -160,11 +162,19 @@ export function GameDetail() {
 
         <Paper withBorder p="md" style={{ flex: 1, minWidth: 280 }}>
           <Group justify="center" gap="md" wrap="nowrap" mb="md">
-            <SideCard player={game.away.player.name} team={game.away.team} />
+            <SideCard
+              playerId={game.away.player.id}
+              player={game.away.player.name}
+              team={game.away.team}
+            />
             <Text size="xl" fw={900} c="dimmed">
               {game.away.goals}-{game.home.goals}
             </Text>
-            <SideCard player={game.home.player.name} team={game.home.team} />
+            <SideCard
+              playerId={game.home.player.id}
+              player={game.home.player.name}
+              team={game.home.team}
+            />
           </Group>
 
           <Table.ScrollContainer minWidth={300}>

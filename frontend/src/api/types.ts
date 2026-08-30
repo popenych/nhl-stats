@@ -27,12 +27,14 @@ export interface Place {
   id: number
   name: string
   photo_path: string | null
+  icon: string | null
 }
 
 export interface Season {
   id: number
   name: string
   sort_order: number
+  icon: string | null
 }
 
 export interface GameSideStats {
@@ -142,24 +144,41 @@ export interface ExtractResponse {
   labels_expected: number
 }
 
+// Mirrors backend MetricKey (app/schemas/stats.py) — every numeric
+// StatsSummary field the trend/leaderboard endpoints can key off of. Short
+// and full display names for these live in lib/stats.ts, not here — this
+// file only carries API shapes.
 export type MetricKey =
   | 'win_pct'
+  | 'wins'
+  | 'losses'
+  | 'games_played'
+  | 'goals_for'
+  | 'goals_against'
   | 'goals_for_per_game'
   | 'goals_against_per_game'
+  | 'goal_diff'
+  | 'goal_diff_per_game'
+  | 'shots_for'
+  | 'shots_per_game'
+  | 'shots_against_per_game'
+  | 'hits_for'
+  | 'hits_per_game'
   | 'shooting_pct'
-  | 'pp_pct'
-  | 'pk_pct'
+  | 'passing_pct_avg'
+  | 'time_on_attack_avg_seconds'
+  | 'faceoffs_won'
   | 'faceoff_pct'
-
-export const METRIC_LABELS: Record<MetricKey, string> = {
-  win_pct: 'W%',
-  goals_for_per_game: 'GF/GP',
-  goals_against_per_game: 'GA/GP',
-  shooting_pct: 'SH%',
-  pp_pct: 'PP%',
-  pk_pct: 'PK%',
-  faceoff_pct: 'FOW%',
-}
+  | 'powerplay_goals'
+  | 'powerplay_total'
+  | 'powerplay_minutes_avg_seconds'
+  | 'pp_pct'
+  | 'penalty_minutes_total_seconds'
+  | 'penalty_minutes_avg_seconds'
+  | 'penalty_kill_situations'
+  | 'penalty_kills_successful'
+  | 'pk_pct'
+  | 'shorthanded_goals'
 
 export interface StatsSummary {
   games_played: number
@@ -171,9 +190,12 @@ export interface StatsSummary {
   goals_against: number
   goals_for_per_game: number
   goals_against_per_game: number
+  goal_diff: number
+  goal_diff_per_game: number
   shots_for: number
   shots_per_game: number
   shots_against_per_game: number
+  hits_for: number
   hits_per_game: number
   shooting_pct: number
   passing_pct_avg: number
@@ -184,10 +206,44 @@ export interface StatsSummary {
   powerplay_total: number
   powerplay_minutes_avg_seconds: number
   pp_pct: number
+  penalty_minutes_total_seconds: number
+  penalty_minutes_avg_seconds: number
+  penalty_kill_situations: number
+  penalty_kills_successful: number
   pk_pct: number
   shorthanded_goals: number
   current_streak: string
   last5: string
+}
+
+export interface TeamRecord {
+  team: Team
+  games_played: number
+  wins: number
+  losses: number
+}
+
+export interface PlayerExtras {
+  best_win_streak: number
+  worst_lose_streak: number
+  most_played_team: TeamRecord | null
+  most_wins_team: TeamRecord | null
+  most_losses_team: TeamRecord | null
+}
+
+export interface PlayerRecord {
+  player: Player
+  games_played: number
+  wins: number
+  losses: number
+}
+
+export interface TeamExtras {
+  best_win_streak: number
+  worst_lose_streak: number
+  most_played_player: PlayerRecord | null
+  most_wins_player: PlayerRecord | null
+  most_losses_player: PlayerRecord | null
 }
 
 export interface PlaceStanding {
@@ -231,6 +287,15 @@ export interface PlayerSummaryRow {
   player: Player
   summary: StatsSummary
 }
+
+export interface PlayerTeamSummaryRow {
+  team: Team
+  summary: StatsSummary
+}
+
+// Which side of the game a player/team was on — filters stats down to only
+// their home games or only their away games.
+export type SideFilter = 'home' | 'away'
 
 export interface TrendPoint {
   x: string

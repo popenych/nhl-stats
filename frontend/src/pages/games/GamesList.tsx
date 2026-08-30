@@ -1,18 +1,30 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button, Group, Paper, Select, SimpleGrid, Table, Title } from '@mantine/core'
-import { IconPlus } from '@tabler/icons-react'
-import { useQuery } from '@tanstack/react-query'
+import { ActionIcon, Button, Group, Paper, Select, SimpleGrid, Table, Title } from '@mantine/core'
+import { modals } from '@mantine/modals'
+import { notifications } from '@mantine/notifications'
+import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as gamesApi from '../../api/games'
 import * as placesApi from '../../api/places'
 import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as teamsApi from '../../api/teams'
+import type { GameListItem } from '../../api/types'
+import { useAuth } from '../../auth/auth-context-value'
 import { GameResultCell } from '../../components/GameResultCell'
+import { TeamLogo } from '../../components/TeamLogo'
+
+function canDelete(userId: number | undefined, isAdmin: boolean, game: GameListItem) {
+  if (isAdmin) return true
+  return userId === game.home.player.id || userId === game.away.player.id
+}
 
 export function GamesList() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [teamId, setTeamId] = useState<string | null>(null)
   const [seasonId, setSeasonId] = useState<string | null>(null)
@@ -24,6 +36,7 @@ export function GamesList() {
   const { data: teams } = useQuery({ queryKey: ['teams'], queryFn: teamsApi.listTeams })
   const { data: seasons } = useQuery({ queryKey: ['seasons'], queryFn: seasonsApi.listSeasons })
   const { data: places } = useQuery({ queryKey: ['places'], queryFn: placesApi.listPlaces })
+  const selectedTeam = (teams ?? []).find((t) => String(t.id) === teamId)
 
   const filters = {
     player_id: playerId ? Number(playerId) : undefined,
@@ -46,6 +59,25 @@ export function GamesList() {
     }
   }
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => gamesApi.deleteGame(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['games'] })
+      notifications.show({ message: 'Game deleted', color: 'green' })
+    },
+    onError: () => notifications.show({ message: 'Failed to delete game', color: 'red' }),
+  })
+
+  function confirmDelete(id: number) {
+    modals.openConfirmModal({
+      title: 'Delete this game?',
+      children: "This can't be undone.",
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => deleteMutation.mutate(id),
+    })
+  }
+
   return (
     <>
       <Group justify="space-between" mb="md">
@@ -60,7 +92,10 @@ export function GamesList() {
           placeholder="Player"
           clearable
           searchable
-          data={(players ?? []).map((p) => ({ value: String(p.id), label: p.name }))}
+          data={(players ?? []).map((p) => ({
+            value: String(p.id),
+            label: p.icon ? `${p.icon} ${p.name}` : p.name,
+          }))}
           value={playerId}
           onChange={resetPage(setPlayerId)}
         />
@@ -71,18 +106,25 @@ export function GamesList() {
           data={(teams ?? []).map((t) => ({ value: String(t.id), label: t.abbreviation }))}
           value={teamId}
           onChange={resetPage(setTeamId)}
+          leftSection={selectedTeam ? <TeamLogo team={selectedTeam} size={18} /> : undefined}
         />
         <Select
           placeholder="Season"
           clearable
-          data={(seasons ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
+          data={(seasons ?? []).map((s) => ({
+            value: String(s.id),
+            label: s.icon ? `${s.icon} ${s.name}` : s.name,
+          }))}
           value={seasonId}
           onChange={resetPage(setSeasonId)}
         />
         <Select
           placeholder="Place"
           clearable
-          data={(places ?? []).map((p) => ({ value: String(p.id), label: p.name }))}
+          data={(places ?? []).map((p) => ({
+            value: String(p.id),
+            label: p.icon ? `${p.icon} ${p.name}` : p.name,
+          }))}
           value={placeId}
           onChange={resetPage(setPlaceId)}
         />
@@ -97,6 +139,7 @@ export function GamesList() {
                 <Table.Th>Result</Table.Th>
                 <Table.Th>Season</Table.Th>
                 <Table.Th>Place</Table.Th>
+                <Table.Th />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -112,11 +155,26 @@ export function GamesList() {
                   </Table.Td>
                   <Table.Td>{g.season.name}</Table.Td>
                   <Table.Td>{g.place.name}</Table.Td>
+                  <Table.Td>
+                    {canDelete(user?.player.id, user?.role === 'admin', g) && (
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          confirmDelete(g.id)
+                        }}
+                        aria-label="Delete game"
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    )}
+                  </Table.Td>
                 </Table.Tr>
               ))}
               {!isLoading && data?.items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={4}>No games yet.</Table.Td>
+                  <Table.Td colSpan={5}>No games yet.</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>

@@ -81,7 +81,10 @@ export function GameStatsGrid({
   confidence?: { home: Record<string, number>; away: Record<string, number> }
   teamHints?: { home: string | null; away: string | null }
 }) {
-  const playerOptions = players.map((p) => ({ value: String(p.id), label: p.name }))
+  const playerOptions = players.map((p) => ({
+    value: String(p.id),
+    label: p.icon ? `${p.icon} ${p.name}` : p.name,
+  }))
   const teamOptions = teams.map((t) => ({
     value: String(t.id),
     label: `${t.abbreviation} — ${t.name}`,

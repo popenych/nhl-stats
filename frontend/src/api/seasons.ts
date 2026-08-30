@@ -8,3 +8,7 @@ export function listSeasons() {
 export function createSeason(name: string) {
   return api.post<Season>('/seasons', { name })
 }
+
+export function updateSeason(id: number, data: { name?: string; icon?: string }) {
+  return api.patch<Season>(`/seasons/${id}`, data)
+}

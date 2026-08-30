@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { AppShell, Burger, Group, Button, Text, NavLink, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import {
+  IconCalendar,
   IconHome,
   IconLogout,
   IconMapPin,
@@ -94,6 +95,13 @@ export function Layout() {
           label="Places"
           leftSection={<IconMapPin size={18} />}
           active={location.pathname.startsWith('/places')}
+        />
+        <NavLink
+          component={Link}
+          to="/seasons"
+          label="Seasons"
+          leftSection={<IconCalendar size={18} />}
+          active={location.pathname.startsWith('/seasons')}
         />
         {user?.role === 'admin' && (
           <NavLink

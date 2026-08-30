@@ -158,6 +158,128 @@ async def test_player_summary_computes_record_and_rates(db: AsyncSession, scenar
     assert summary.time_on_attack_avg_seconds == pytest.approx(300.0)
     assert summary.powerplay_goals == 1
     assert summary.powerplay_total == 3
+    assert summary.hits_for == 30
+    assert summary.goal_diff == -1
+    assert summary.goal_diff_per_game == pytest.approx((6 - 7) / 3)
+    assert summary.penalty_minutes_total_seconds == pytest.approx(0.0)
+    assert summary.penalty_minutes_avg_seconds == pytest.approx(0.0)
+    assert summary.penalty_kill_situations == 6
+    assert summary.penalty_kills_successful == 3
+
+
+async def test_player_summary_filters_by_team(db: AsyncSession, scenario: dict) -> None:
+    summary = await stats_service.player_summary(
+        db, scenario["alex_id"], team_id=scenario["team_a_id"]
+    )
+
+    # Alex wore team_a in games 1 (win) and 3 (loss) only — game 2 (tie) was team_b.
+    assert summary.games_played == 2
+    assert (summary.wins, summary.losses, summary.ties) == (1, 1, 0)
+    assert summary.goals_for == 3 + 1
+    assert summary.goals_against == 1 + 4
+
+
+async def test_player_summary_filters_by_side(db: AsyncSession, scenario: dict) -> None:
+    # Alex was home in games 1 and 3, away in game 2.
+    home_summary = await stats_service.player_summary(db, scenario["alex_id"], side="home")
+    away_summary = await stats_service.player_summary(db, scenario["alex_id"], side="away")
+
+    assert home_summary.games_played == 2
+    assert (home_summary.wins, home_summary.losses) == (1, 1)
+    assert away_summary.games_played == 1
+    assert away_summary.ties == 1
+
+
+async def test_player_team_breakdown(db: AsyncSession, scenario: dict) -> None:
+    rows = await stats_service.player_team_breakdown(db, scenario["alex_id"])
+
+    by_abbr = {r.team.abbreviation: r.summary for r in rows}
+    assert set(by_abbr) == {"OTT", "NSH"}
+    assert by_abbr["OTT"].games_played == 2
+    assert (by_abbr["OTT"].wins, by_abbr["OTT"].losses) == (1, 1)
+    assert by_abbr["NSH"].games_played == 1
+    assert by_abbr["NSH"].ties == 1
+
+
+async def test_head_to_head_filters_by_team_and_side(db: AsyncSession, scenario: dict) -> None:
+    h2h = await stats_service.head_to_head(
+        db,
+        scenario["alex_id"],
+        scenario["friend_id"],
+        team_id_a=scenario["team_a_id"],
+        side="home",
+    )
+
+    # Only games 1 and 3 have alex wearing team_a at home — game 2 is excluded.
+    assert h2h.games_played == 2
+    assert h2h.player_a_wins == 1
+    assert h2h.player_b_wins == 1
+    assert h2h.ties == 0
+
+
+async def test_player_extras_streaks_and_team_breakdown(db: AsyncSession, scenario: dict) -> None:
+    extras = await stats_service.player_extras(db, scenario["alex_id"])
+
+    # Outcomes in order: W, T, L — no streak longer than 1 either direction.
+    assert extras.best_win_streak == 1
+    assert extras.worst_lose_streak == 1
+
+    assert extras.most_played_team is not None
+    assert extras.most_played_team.team.abbreviation == "OTT"
+    assert extras.most_played_team.games_played == 2
+    assert extras.most_wins_team is not None
+    assert extras.most_wins_team.team.abbreviation == "OTT"
+    assert extras.most_wins_team.wins == 1
+    assert extras.most_losses_team is not None
+    assert extras.most_losses_team.team.abbreviation == "OTT"
+    assert extras.most_losses_team.losses == 1
+
+
+async def test_team_extras_streaks_and_player_breakdown(db: AsyncSession, scenario: dict) -> None:
+    extras = await stats_service.team_extras(db, scenario["team_a_id"])
+
+    # As team_a: g1 (alex, W), g2 (friend, T), g3 (alex, L) -> W, T, L in order.
+    assert extras.best_win_streak == 1
+    assert extras.worst_lose_streak == 1
+
+    assert extras.most_played_player is not None
+    assert extras.most_played_player.player.id == scenario["alex_id"]
+    assert extras.most_played_player.games_played == 2
+    assert extras.most_wins_player is not None
+    assert extras.most_wins_player.player.id == scenario["alex_id"]
+    assert extras.most_wins_player.wins == 1
+    assert extras.most_losses_player is not None
+    assert extras.most_losses_player.player.id == scenario["alex_id"]
+    assert extras.most_losses_player.losses == 1
+
+
+def test_streaks_finds_longest_run_anywhere_in_sequence() -> None:
+    from types import SimpleNamespace
+
+    from app.services.stats_service import _Result, _streaks
+
+    def result(own_goals: int, opp_goals: int) -> _Result:
+        return _Result(
+            date=date(2026, 1, 1),
+            own=SimpleNamespace(goals=own_goals),  # type: ignore[arg-type]
+            opp=SimpleNamespace(goals=opp_goals),  # type: ignore[arg-type]
+        )
+
+    # W W L L L T W W W  -> best win streak 3, worst lose streak 3
+    sequence = [
+        result(1, 0),
+        result(1, 0),
+        result(0, 1),
+        result(0, 1),
+        result(0, 1),
+        result(1, 1),
+        result(1, 0),
+        result(1, 0),
+        result(1, 0),
+    ]
+    best_win, worst_lose = _streaks(sequence)
+    assert best_win == 3
+    assert worst_lose == 3
 
 
 async def test_player_summary_empty_when_no_games(db: AsyncSession, scenario: dict) -> None:

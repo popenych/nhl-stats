@@ -3,10 +3,12 @@ from pydantic import BaseModel, ConfigDict
 
 class PlaceCreate(BaseModel):
     name: str
+    icon: str | None = None
 
 
 class PlaceUpdate(BaseModel):
     name: str | None = None
+    icon: str | None = None
 
 
 class PlaceOut(BaseModel):
@@ -15,3 +17,4 @@ class PlaceOut(BaseModel):
     id: int
     name: str
     photo_path: str | None
+    icon: str | None

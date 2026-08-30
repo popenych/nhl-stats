@@ -10,3 +10,4 @@ class Place(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
     photo_path: Mapped[str | None] = mapped_column(default=None)
+    icon: Mapped[str | None] = mapped_column(default=None)

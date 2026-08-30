@@ -15,3 +15,13 @@ export function outcomeColor(outcome: 'win' | 'loss' | 'tie' | null): string | u
 export function tint(hex: string) {
   return `${hex}26`
 }
+
+// Self-referential coloring for a signed value (e.g. Goals Diff) — green
+// when positive, red when negative, neutral at zero. Distinct from
+// outcomeColor: this looks only at the value's own sign, not a comparison
+// against another value (see lib/stats.ts's betterSide for that).
+export function signColor(value: number): string | undefined {
+  if (value > 0) return ATOM_GREEN
+  if (value < 0) return ATOM_RED
+  return undefined
+}

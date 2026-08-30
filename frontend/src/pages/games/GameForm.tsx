@@ -302,7 +302,10 @@ export function GameForm({
                 label="Season"
                 createLabel="Add a season"
                 icon={<IconDeviceGamepad2 size={16} />}
-                data={(seasons ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
+                data={(seasons ?? []).map((s) => ({
+                  value: String(s.id),
+                  label: s.icon ? `${s.icon} ${s.name}` : s.name,
+                }))}
                 value={form.values.seasonId}
                 onChange={(v) => form.setFieldValue('seasonId', v)}
                 onCreate={async (name) => {
@@ -315,7 +318,10 @@ export function GameForm({
                 label="Place"
                 createLabel="Add a place"
                 icon={<IconMapPin size={16} />}
-                data={(places ?? []).map((p) => ({ value: String(p.id), label: p.name }))}
+                data={(places ?? []).map((p) => ({
+                  value: String(p.id),
+                  label: p.icon ? `${p.icon} ${p.name}` : p.name,
+                }))}
                 value={form.values.placeId}
                 onChange={(v) => form.setFieldValue('placeId', v)}
                 onCreate={async (name) => {

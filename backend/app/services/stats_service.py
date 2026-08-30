@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.game import Game
 from app.models.game_side import GameSide
 from app.models.player import Player
+from app.models.team import Team
 from app.schemas.player import PlayerOut
 from app.schemas.stats import (
     HeadToHeadOut,
@@ -16,12 +17,19 @@ from app.schemas.stats import (
     MetricKey,
     PlaceStanding,
     PlaceSummary,
+    PlayerExtras,
+    PlayerRecord,
     PlayerSummaryRow,
+    PlayerTeamSummaryRow,
+    SideFilter,
     StatsSummary,
+    TeamExtras,
+    TeamRecord,
     TrendPoint,
     TrendResponse,
     TrendSeries,
 )
+from app.schemas.team import TeamOut
 from app.services.game_service import list_all_games
 
 
@@ -62,6 +70,21 @@ def _split_by_team(games: list[Game], team_id: int) -> list[_Result]:
     return results
 
 
+def _filter_by_side(results: list[_Result], side: SideFilter | None) -> list[_Result]:
+    if side is None:
+        return results
+    return [r for r in results if r.own.side == side]
+
+
+def _group_by_team(results: list[_Result]) -> tuple[dict[int, list[_Result]], dict[int, Team]]:
+    by_team: dict[int, list[_Result]] = {}
+    teams: dict[int, Team] = {}
+    for r in results:
+        by_team.setdefault(r.own.team_id, []).append(r)
+        teams[r.own.team_id] = r.own.team
+    return by_team, teams
+
+
 def _current_streak(results: list[_Result]) -> str:
     if not results:
         return ""
@@ -78,6 +101,27 @@ def _last5(results: list[_Result]) -> str:
     return "".join(_outcome(r) for r in reversed(results[-5:]))
 
 
+def _streaks(results: list[_Result]) -> tuple[int, int]:
+    """Longest win streak and longest losing streak, anywhere in the
+    chronological sequence (not just the current one)."""
+    best_win = worst_lose = 0
+    cur_win = cur_lose = 0
+    for r in results:
+        outcome = _outcome(r)
+        if outcome == "W":
+            cur_win += 1
+            cur_lose = 0
+            best_win = max(best_win, cur_win)
+        elif outcome == "L":
+            cur_lose += 1
+            cur_win = 0
+            worst_lose = max(worst_lose, cur_lose)
+        else:
+            cur_win = 0
+            cur_lose = 0
+    return best_win, worst_lose
+
+
 def summarize(results: list[_Result]) -> StatsSummary:
     gp = len(results)
     if gp == 0:
@@ -91,9 +135,12 @@ def summarize(results: list[_Result]) -> StatsSummary:
             goals_against=0,
             goals_for_per_game=0.0,
             goals_against_per_game=0.0,
+            goal_diff=0,
+            goal_diff_per_game=0.0,
             shots_for=0,
             shots_per_game=0.0,
             shots_against_per_game=0.0,
+            hits_for=0,
             hits_per_game=0.0,
             shooting_pct=0.0,
             passing_pct_avg=0.0,
@@ -104,6 +151,10 @@ def summarize(results: list[_Result]) -> StatsSummary:
             powerplay_total=0,
             powerplay_minutes_avg_seconds=0.0,
             pp_pct=0.0,
+            penalty_minutes_total_seconds=0.0,
+            penalty_minutes_avg_seconds=0.0,
+            penalty_kill_situations=0,
+            penalty_kills_successful=0,
             pk_pct=0.0,
             shorthanded_goals=0,
             current_streak="",
@@ -126,6 +177,7 @@ def summarize(results: list[_Result]) -> StatsSummary:
     pp_goals = sum(r.own.powerplay_goals for r in results)
     pp_total = sum(r.own.powerplay_total for r in results)
     pp_minutes_total = sum(r.own.powerplay_minutes_seconds for r in results)
+    penalty_minutes_total = sum(r.own.penalty_minutes_seconds for r in results)
     opp_pp_goals = sum(r.opp.powerplay_goals for r in results)
     opp_pp_total = sum(r.opp.powerplay_total for r in results)
     sh_goals = sum(r.own.shorthanded_goals for r in results)
@@ -142,9 +194,12 @@ def summarize(results: list[_Result]) -> StatsSummary:
         goals_against=goals_against,
         goals_for_per_game=goals_for / gp,
         goals_against_per_game=goals_against / gp,
+        goal_diff=goals_for - goals_against,
+        goal_diff_per_game=(goals_for - goals_against) / gp,
         shots_for=shots_for,
         shots_per_game=shots_for / gp,
         shots_against_per_game=shots_against / gp,
+        hits_for=hits_for,
         hits_per_game=hits_for / gp,
         shooting_pct=(goals_for / shots_for) if shots_for else 0.0,
         passing_pct_avg=passing_total / gp,
@@ -155,6 +210,10 @@ def summarize(results: list[_Result]) -> StatsSummary:
         powerplay_total=pp_total,
         powerplay_minutes_avg_seconds=pp_minutes_total / gp,
         pp_pct=(pp_goals / pp_total) if pp_total else 0.0,
+        penalty_minutes_total_seconds=penalty_minutes_total,
+        penalty_minutes_avg_seconds=penalty_minutes_total / gp,
+        penalty_kill_situations=opp_pp_total,
+        penalty_kills_successful=opp_pp_total - opp_pp_goals,
         pk_pct=(1 - opp_pp_goals / opp_pp_total) if opp_pp_total else 1.0,
         shorthanded_goals=sh_goals,
         current_streak=_current_streak(results),
@@ -167,17 +226,140 @@ def _metric_value(summary: StatsSummary, metric: MetricKey) -> float:
 
 
 async def player_summary(
-    db: AsyncSession, player_id: int, *, season_id: int | None = None
+    db: AsyncSession,
+    player_id: int,
+    *,
+    season_id: int | None = None,
+    team_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
 ) -> StatsSummary:
-    games = await list_all_games(db, player_id=player_id, season_id=season_id)
-    return summarize(_split_by_player(games, player_id))
+    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    results = _split_by_player(games, player_id)
+    if team_id is not None:
+        results = [r for r in results if r.own.team_id == team_id]
+    results = _filter_by_side(results, side)
+    return summarize(results)
+
+
+async def player_extras(
+    db: AsyncSession,
+    player_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> PlayerExtras:
+    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_player(games, player_id), side)
+    best_win_streak, worst_lose_streak = _streaks(results)
+
+    by_team, teams = _group_by_team(results)
+
+    records = []
+    for team_id, team_results in by_team.items():
+        s = summarize(team_results)
+        records.append(
+            TeamRecord(
+                team=TeamOut.model_validate(teams[team_id]),
+                games_played=s.games_played,
+                wins=s.wins,
+                losses=s.losses,
+            )
+        )
+
+    most_played = max(records, key=lambda r: r.games_played, default=None)
+    most_wins = max(records, key=lambda r: r.wins, default=None)
+    most_losses = max(records, key=lambda r: r.losses, default=None)
+
+    return PlayerExtras(
+        best_win_streak=best_win_streak,
+        worst_lose_streak=worst_lose_streak,
+        most_played_team=most_played,
+        most_wins_team=most_wins,
+        most_losses_team=most_losses,
+    )
+
+
+async def player_team_breakdown(
+    db: AsyncSession,
+    player_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> list[PlayerTeamSummaryRow]:
+    """Every team this player has worn, each with its own full StatsSummary —
+    backs a per-player table shaped like the Home leaderboard, but with rows
+    keyed by team instead of by player."""
+    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_player(games, player_id), side)
+    by_team, teams = _group_by_team(results)
+
+    rows = [
+        PlayerTeamSummaryRow(
+            team=TeamOut.model_validate(teams[team_id]), summary=summarize(team_results)
+        )
+        for team_id, team_results in by_team.items()
+    ]
+    rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
+    return rows
 
 
 async def team_summary(
-    db: AsyncSession, team_id: int, *, season_id: int | None = None
+    db: AsyncSession,
+    team_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
 ) -> StatsSummary:
-    games = await list_all_games(db, team_id=team_id, season_id=season_id)
-    return summarize(_split_by_team(games, team_id))
+    games = await list_all_games(db, team_id=team_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_team(games, team_id), side)
+    return summarize(results)
+
+
+async def team_extras(
+    db: AsyncSession,
+    team_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> TeamExtras:
+    games = await list_all_games(db, team_id=team_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_team(games, team_id), side)
+    best_win_streak, worst_lose_streak = _streaks(results)
+
+    by_player: dict[int, list[_Result]] = {}
+    players: dict[int, Player] = {}
+    for r in results:
+        by_player.setdefault(r.own.player_id, []).append(r)
+        players[r.own.player_id] = r.own.player
+
+    records = []
+    for player_id, player_results in by_player.items():
+        s = summarize(player_results)
+        records.append(
+            PlayerRecord(
+                player=PlayerOut.model_validate(players[player_id]),
+                games_played=s.games_played,
+                wins=s.wins,
+                losses=s.losses,
+            )
+        )
+
+    most_played = max(records, key=lambda r: r.games_played, default=None)
+    most_wins = max(records, key=lambda r: r.wins, default=None)
+    most_losses = max(records, key=lambda r: r.losses, default=None)
+
+    return TeamExtras(
+        best_win_streak=best_win_streak,
+        worst_lose_streak=worst_lose_streak,
+        most_played_player=most_played,
+        most_wins_player=most_wins,
+        most_losses_player=most_losses,
+    )
 
 
 async def place_summary(
@@ -213,10 +395,31 @@ async def place_summary(
 
 
 async def head_to_head(
-    db: AsyncSession, player_a_id: int, player_b_id: int, *, season_id: int | None = None
+    db: AsyncSession,
+    player_a_id: int,
+    player_b_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    team_id_a: int | None = None,
+    team_id_b: int | None = None,
+    side: SideFilter | None = None,
 ) -> HeadToHeadOut:
-    games = await list_all_games(db, player_id=player_a_id, season_id=season_id)
+    games = await list_all_games(
+        db, player_id=player_a_id, season_id=season_id, place_id=place_id
+    )
     games = [g for g in games if any(s.player_id == player_b_id for s in g.sides)]
+
+    def side_for(game: Game, player_id: int) -> GameSide:
+        return next(s for s in game.sides if s.player_id == player_id)
+
+    if team_id_a is not None:
+        games = [g for g in games if side_for(g, player_a_id).team_id == team_id_a]
+    if team_id_b is not None:
+        games = [g for g in games if side_for(g, player_b_id).team_id == team_id_b]
+    if side is not None:
+        games = [g for g in games if side_for(g, player_a_id).side == side]
+
     results_a = _split_by_player(games, player_a_id)
     results_b = _split_by_player(games, player_b_id)
 
@@ -250,19 +453,28 @@ async def head_to_head(
 
 
 async def _group_all_players(
-    db: AsyncSession, *, season_id: int | None
+    db: AsyncSession,
+    *,
+    season_id: int | None,
+    team_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
 ) -> tuple[dict[int, list[_Result]], dict[int, Player]]:
-    games = await list_all_games(db, season_id=season_id)
+    games = await list_all_games(db, season_id=season_id, place_id=place_id)
 
     by_player: dict[int, list[_Result]] = {}
     players: dict[int, Player] = {}
     for game in games:
-        for side in game.sides:
-            opp = next(s for s in game.sides if s is not side)
-            by_player.setdefault(side.player_id, []).append(
-                _Result(date=game.date, own=side, opp=opp)
+        for game_side in game.sides:
+            if team_id is not None and game_side.team_id != team_id:
+                continue
+            if side is not None and game_side.side != side:
+                continue
+            opp = next(s for s in game.sides if s is not game_side)
+            by_player.setdefault(game_side.player_id, []).append(
+                _Result(date=game.date, own=game_side, opp=opp)
             )
-            players[side.player_id] = side.player
+            players[game_side.player_id] = game_side.player
 
     if not by_player:
         all_players = (await db.execute(select(Player))).scalars().all()
@@ -294,12 +506,19 @@ async def leaderboard(
 
 
 async def all_player_summaries(
-    db: AsyncSession, *, season_id: int | None = None
+    db: AsyncSession,
+    *,
+    season_id: int | None = None,
+    team_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
 ) -> list[PlayerSummaryRow]:
     """Every player's full StatsSummary in one call — backs the Home page
     leaderboard table, which shows all the main stats at once rather than
     one metric at a time behind a selector."""
-    by_player, players = await _group_all_players(db, season_id=season_id)
+    by_player, players = await _group_all_players(
+        db, season_id=season_id, team_id=team_id, place_id=place_id, side=side
+    )
 
     rows = [
         PlayerSummaryRow(player=PlayerOut.model_validate(players[pid]), summary=summarize(results))
@@ -317,22 +536,26 @@ async def trend(
     season_id: int | None = None,
     player_id: int | None = None,
     team_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
 ) -> TrendResponse:
-    games = await list_all_games(db, season_id=season_id, team_id=team_id)
+    games = await list_all_games(db, season_id=season_id, team_id=team_id, place_id=place_id)
 
     by_player: dict[int, list[_Result]] = {}
     players: dict[int, Player] = {}
     for game in games:
-        for side in game.sides:
-            if team_id is not None and side.team_id != team_id:
+        for game_side in game.sides:
+            if team_id is not None and game_side.team_id != team_id:
                 continue
-            if player_id is not None and side.player_id != player_id:
+            if player_id is not None and game_side.player_id != player_id:
                 continue
-            opp = next(s for s in game.sides if s is not side)
-            by_player.setdefault(side.player_id, []).append(
-                _Result(date=game.date, own=side, opp=opp)
+            if side is not None and game_side.side != side:
+                continue
+            opp = next(s for s in game.sides if s is not game_side)
+            by_player.setdefault(game_side.player_id, []).append(
+                _Result(date=game.date, own=game_side, opp=opp)
             )
-            players[side.player_id] = side.player
+            players[game_side.player_id] = game_side.player
 
     series = []
     for pid, results in by_player.items():

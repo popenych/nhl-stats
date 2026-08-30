@@ -17,7 +17,7 @@ async def list_places(db: DbSession, _user: CurrentUser) -> object:
 
 @router.post("", response_model=PlaceOut, status_code=status.HTTP_201_CREATED)
 async def create_place(data: PlaceCreate, db: DbSession, _user: CurrentUser) -> object:
-    place = Place(name=data.name)
+    place = Place(name=data.name, icon=data.icon)
     db.add(place)
     try:
         await db.commit()
@@ -38,6 +38,8 @@ async def update_place(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Place not found")
     if data.name is not None:
         place.name = data.name
+    if data.icon is not None:
+        place.icon = data.icon
     await db.commit()
     return place
 

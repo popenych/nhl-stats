@@ -15,6 +15,7 @@ import { PlayersIndex } from './pages/players/PlayersIndex'
 import { PlayerPage } from './pages/players/PlayerPage'
 import { PlacesIndex } from './pages/places/PlacesIndex'
 import { PlacePage } from './pages/places/PlacePage'
+import { SeasonsIndex } from './pages/seasons/SeasonsIndex'
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
         <Route path="/players/:id" element={<PlayerPage />} />
         <Route path="/places" element={<PlacesIndex />} />
         <Route path="/places/:id" element={<PlacePage />} />
+        <Route path="/seasons" element={<SeasonsIndex />} />
         <Route
           path="/admin/users"
           element={

@@ -1,28 +1,26 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, Group, Paper, Table, Text, TextInput, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import * as placesApi from '../../api/places'
-import type { Place } from '../../api/types'
+import * as seasonsApi from '../../api/seasons'
+import type { Season } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 
-function PlaceRow({ place }: { place: Place }) {
-  const navigate = useNavigate()
+function SeasonRow({ season }: { season: Season }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
-  const [icon, setIcon] = useState(place.icon ?? '')
+  const [icon, setIcon] = useState(season.icon ?? '')
 
   const updateMutation = useMutation({
-    mutationFn: (newIcon: string) => placesApi.updatePlace(place.id, { icon: newIcon }),
+    mutationFn: (newIcon: string) => seasonsApi.updateSeason(season.id, { icon: newIcon }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['places'] })
-      notifications.show({ message: 'Place updated', color: 'green' })
+      queryClient.invalidateQueries({ queryKey: ['seasons'] })
+      notifications.show({ message: 'Season updated', color: 'green' })
       setEditing(false)
     },
-    onError: () => notifications.show({ message: 'Failed to update place', color: 'red' }),
+    onError: () => notifications.show({ message: 'Failed to update season', color: 'red' }),
   })
 
   if (editing) {
@@ -36,7 +34,7 @@ function PlaceRow({ place }: { place: Place }) {
               placeholder="Icon"
               w={70}
             />
-            <Text>{place.name}</Text>
+            <Text>{season.name}</Text>
             <Button
               size="xs"
               onClick={() => updateMutation.mutate(icon)}
@@ -54,19 +52,18 @@ function PlaceRow({ place }: { place: Place }) {
   }
 
   return (
-    <Table.Tr onClick={() => navigate(`/places/${place.id}`)} style={{ cursor: 'pointer' }}>
+    <Table.Tr>
       <Table.Td>
-        {place.icon ? `${place.icon} ` : ''}
-        {place.name}
+        {season.icon ? `${season.icon} ` : ''}
+        {season.name}
       </Table.Td>
       <Table.Td>
         {user?.role === 'admin' && (
           <Button
             size="xs"
             variant="light"
-            onClick={(e) => {
-              e.stopPropagation()
-              setIcon(place.icon ?? '')
+            onClick={() => {
+              setIcon(season.icon ?? '')
               setEditing(true)
             }}
           >
@@ -78,13 +75,13 @@ function PlaceRow({ place }: { place: Place }) {
   )
 }
 
-export function PlacesIndex() {
-  const { data: places } = useQuery({ queryKey: ['places'], queryFn: placesApi.listPlaces })
+export function SeasonsIndex() {
+  const { data: seasons } = useQuery({ queryKey: ['seasons'], queryFn: seasonsApi.listSeasons })
 
   return (
     <>
       <Title order={2} mb="md">
-        Places
+        Seasons
       </Title>
       <Paper withBorder p="md">
         <Table striped highlightOnHover>
@@ -95,8 +92,8 @@ export function PlacesIndex() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {places?.map((p) => (
-              <PlaceRow key={p.id} place={p} />
+            {seasons?.map((s) => (
+              <SeasonRow key={s.id} season={s} />
             ))}
           </Table.Tbody>
         </Table>

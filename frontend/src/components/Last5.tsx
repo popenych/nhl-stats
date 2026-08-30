@@ -11,7 +11,7 @@ function letterColor(letter: string) {
 export function Last5({ value }: { value: string }) {
   if (!value) return null
   return (
-    <Group gap={2} wrap="nowrap">
+    <Group gap={2} wrap="nowrap" justify="flex-end">
       {value.split('').map((letter, i) => (
         <Text key={i} fw={700} size="sm" style={{ color: letterColor(letter) }}>
           {letter}

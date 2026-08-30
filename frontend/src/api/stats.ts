@@ -4,8 +4,12 @@ import type {
   LeaderboardResponse,
   MetricKey,
   PlaceSummary,
+  PlayerExtras,
   PlayerSummaryRow,
+  PlayerTeamSummaryRow,
+  SideFilter,
   StatsSummary,
+  TeamExtras,
   TrendResponse,
 } from './types'
 
@@ -18,26 +22,94 @@ function qs(params: Record<string, string | number | undefined>) {
   return s ? `?${s}` : ''
 }
 
-export function getPlayerSummary(playerId: number, seasonId?: number) {
-  return api.get<StatsSummary>(`/stats/players/${playerId}/summary${qs({ season_id: seasonId })}`)
+export interface StatsFilters {
+  seasonId?: number
+  teamId?: number
+  placeId?: number
+  side?: SideFilter
 }
 
-export function getTeamSummary(teamId: number, seasonId?: number) {
-  return api.get<StatsSummary>(`/stats/teams/${teamId}/summary${qs({ season_id: seasonId })}`)
+export function getPlayerSummary(playerId: number, options: StatsFilters = {}) {
+  const { seasonId, teamId, placeId, side } = options
+  return api.get<StatsSummary>(
+    `/stats/players/${playerId}/summary${qs({ season_id: seasonId, team_id: teamId, place_id: placeId, side })}`,
+  )
+}
+
+export function getPlayerExtras(
+  playerId: number,
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<PlayerExtras>(
+    `/stats/players/${playerId}/extras${qs({ season_id: seasonId, place_id: placeId, side })}`,
+  )
+}
+
+export function getPlayerTeamBreakdown(
+  playerId: number,
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<PlayerTeamSummaryRow[]>(
+    `/stats/players/${playerId}/by-team${qs({ season_id: seasonId, place_id: placeId, side })}`,
+  )
+}
+
+export function getTeamSummary(
+  teamId: number,
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<StatsSummary>(
+    `/stats/teams/${teamId}/summary${qs({ season_id: seasonId, place_id: placeId, side })}`,
+  )
+}
+
+export function getTeamExtras(
+  teamId: number,
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<TeamExtras>(
+    `/stats/teams/${teamId}/extras${qs({ season_id: seasonId, place_id: placeId, side })}`,
+  )
 }
 
 export function getPlaceSummary(placeId: number, seasonId?: number) {
   return api.get<PlaceSummary>(`/stats/places/${placeId}/summary${qs({ season_id: seasonId })}`)
 }
 
-export function getHeadToHead(playerA: number, playerB: number, seasonId?: number) {
+export function getHeadToHead(
+  playerA: number,
+  playerB: number,
+  options: {
+    seasonId?: number
+    placeId?: number
+    teamIdA?: number
+    teamIdB?: number
+    side?: SideFilter
+  } = {},
+) {
+  const { seasonId, placeId, teamIdA, teamIdB, side } = options
   return api.get<HeadToHead>(
-    `/stats/head-to-head${qs({ player_a: playerA, player_b: playerB, season_id: seasonId })}`,
+    `/stats/head-to-head${qs({
+      player_a: playerA,
+      player_b: playerB,
+      season_id: seasonId,
+      place_id: placeId,
+      team_id_a: teamIdA,
+      team_id_b: teamIdB,
+      side,
+    })}`,
   )
 }
 
-export function getAllPlayerSummaries(seasonId?: number) {
-  return api.get<PlayerSummaryRow[]>(`/stats/players-summary${qs({ season_id: seasonId })}`)
+export function getAllPlayerSummaries(options: StatsFilters = {}) {
+  const { seasonId, teamId, placeId, side } = options
+  return api.get<PlayerSummaryRow[]>(
+    `/stats/players-summary${qs({ season_id: seasonId, team_id: teamId, place_id: placeId, side })}`,
+  )
 }
 
 export function getLeaderboard(metric: MetricKey, seasonId?: number) {
@@ -50,9 +122,19 @@ export function getTrend(options: {
   seasonId?: number
   playerId?: number
   teamId?: number
+  placeId?: number
+  side?: SideFilter
 }) {
-  const { metric, x, seasonId, playerId, teamId } = options
+  const { metric, x, seasonId, playerId, teamId, placeId, side } = options
   return api.get<TrendResponse>(
-    `/stats/trend${qs({ metric, x, season_id: seasonId, player_id: playerId, team_id: teamId })}`,
+    `/stats/trend${qs({
+      metric,
+      x,
+      season_id: seasonId,
+      player_id: playerId,
+      team_id: teamId,
+      place_id: placeId,
+      side,
+    })}`,
   )
 }
