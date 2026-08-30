@@ -476,7 +476,12 @@ async def _group_all_players(
             )
             players[game_side.player_id] = game_side.player
 
-    if not by_player:
+    # Show every player at 0 only for the genuinely-unfiltered, no-games-
+    # logged-yet case — not when a specific season/team/place/side combo
+    # just happens to match nothing, which should read as "no games yet"
+    # for that filter rather than implying every player is scoreless.
+    no_filters_active = season_id is None and team_id is None and place_id is None and side is None
+    if not by_player and no_filters_active:
         all_players = (await db.execute(select(Player))).scalars().all()
         for p in all_players:
             players[p.id] = p

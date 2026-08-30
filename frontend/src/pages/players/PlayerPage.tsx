@@ -448,7 +448,12 @@ export function PlayerPage() {
           {opponentId ? `Games vs ${opponentName ?? ''}` : 'Recent games'}
         </Title>
         <GamesMiniTable
-          filters={{ player_id: playerId }}
+          filters={{
+            player_id: playerId,
+            season_id: seasonIdNum,
+            team_id: teamIdMeNum,
+            place_id: placeIdNum,
+          }}
           highlightPlayerId={playerId}
           opponentId={opponentId ? Number(opponentId) : undefined}
         />

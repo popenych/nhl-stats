@@ -305,6 +305,21 @@ async def test_all_player_summaries_returns_every_player_with_full_stats(
     )
 
 
+async def test_all_player_summaries_empty_under_filter_does_not_list_everyone(
+    db: AsyncSession, scenario: dict
+) -> None:
+    """A filter combo matching zero games should read as "no games yet" for
+    that filter — not silently fall back to listing every player at 0, which
+    is only correct for the genuinely-unfiltered/no-games-anywhere case."""
+    unused_team = Team(abbreviation="TOR", name="Toronto Maple Leafs")
+    db.add(unused_team)
+    await db.commit()
+
+    rows = await stats_service.all_player_summaries(db, team_id=unused_team.id)
+
+    assert rows == []
+
+
 async def test_head_to_head(db: AsyncSession, scenario: dict) -> None:
     h2h = await stats_service.head_to_head(db, scenario["alex_id"], scenario["friend_id"])
 

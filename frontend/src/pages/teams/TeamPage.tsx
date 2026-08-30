@@ -330,7 +330,10 @@ export function TeamPage() {
         <TrendChart trend={trend} />
       </Paper>
 
-      <GamesMiniTable filters={{ team_id: teamId }} highlightTeamId={teamId} />
+      <GamesMiniTable
+        filters={{ team_id: teamId, season_id: seasonIdNum, place_id: placeIdNum }}
+        highlightTeamId={teamId}
+      />
     </Stack>
   )
 }
