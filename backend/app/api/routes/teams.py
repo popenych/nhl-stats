@@ -25,7 +25,7 @@ async def get_team(team_id: int, db: DbSession, _user: CurrentUser) -> object:
 
 
 @router.post("", response_model=TeamOut, status_code=status.HTTP_201_CREATED)
-async def create_team(data: TeamCreate, db: DbSession, _admin: AdminUser) -> object:
+async def create_team(data: TeamCreate, db: DbSession, _user: CurrentUser) -> object:
     team = Team(abbreviation=data.abbreviation, name=data.name)
     db.add(team)
     try:
@@ -39,9 +39,7 @@ async def create_team(data: TeamCreate, db: DbSession, _admin: AdminUser) -> obj
 
 
 @router.patch("/{team_id}", response_model=TeamOut)
-async def update_team(
-    team_id: int, data: TeamUpdate, db: DbSession, _admin: AdminUser
-) -> object:
+async def update_team(team_id: int, data: TeamUpdate, db: DbSession, _admin: AdminUser) -> object:
     team = await db.get(Team, team_id)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")

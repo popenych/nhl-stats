@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Group, Paper, Table, Text, TextInput, Title } from '@mantine/core'
+import { Button, Group, Modal, Paper, Stack, Table, Text, TextInput, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
+import { IconPlus } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as placesApi from '../../api/places'
@@ -13,10 +14,12 @@ function PlaceRow({ place }: { place: Place }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(place.name)
   const [icon, setIcon] = useState(place.icon ?? '')
 
   const updateMutation = useMutation({
-    mutationFn: (newIcon: string) => placesApi.updatePlace(place.id, { icon: newIcon }),
+    mutationFn: (data: { name: string; icon: string }) =>
+      placesApi.updatePlace(place.id, { name: data.name, icon: data.icon }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['places'] })
       notifications.show({ message: 'Place updated', color: 'green' })
@@ -36,10 +39,10 @@ function PlaceRow({ place }: { place: Place }) {
               placeholder="Icon"
               w={70}
             />
-            <Text>{place.name}</Text>
+            <TextInput value={name} onChange={(e) => setName(e.currentTarget.value)} />
             <Button
               size="xs"
-              onClick={() => updateMutation.mutate(icon)}
+              onClick={() => updateMutation.mutate({ name, icon })}
               loading={updateMutation.isPending}
             >
               Save
@@ -66,11 +69,12 @@ function PlaceRow({ place }: { place: Place }) {
             variant="light"
             onClick={(e) => {
               e.stopPropagation()
+              setName(place.name)
               setIcon(place.icon ?? '')
               setEditing(true)
             }}
           >
-            Edit icon
+            Edit
           </Button>
         )}
       </Table.Td>
@@ -78,14 +82,57 @@ function PlaceRow({ place }: { place: Place }) {
   )
 }
 
+function NewPlaceModal({ opened, onClose }: { opened: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [icon, setIcon] = useState('')
+
+  const createMutation = useMutation({
+    mutationFn: () => placesApi.createPlace(name, icon || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['places'] })
+      notifications.show({ message: 'Place created', color: 'green' })
+      setName('')
+      setIcon('')
+      onClose()
+    },
+    onError: () => notifications.show({ message: 'Failed to create place', color: 'red' }),
+  })
+
+  return (
+    <Modal opened={opened} onClose={onClose} title="New place">
+      <Stack>
+        <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} />
+        <TextInput
+          label="Icon"
+          placeholder="e.g. an emoji"
+          value={icon}
+          onChange={(e) => setIcon(e.currentTarget.value)}
+        />
+        <Button
+          onClick={() => createMutation.mutate()}
+          loading={createMutation.isPending}
+          disabled={!name.trim()}
+        >
+          Create
+        </Button>
+      </Stack>
+    </Modal>
+  )
+}
+
 export function PlacesIndex() {
   const { data: places } = useQuery({ queryKey: ['places'], queryFn: placesApi.listPlaces })
+  const [modalOpened, setModalOpened] = useState(false)
 
   return (
     <>
-      <Title order={2} mb="md">
-        Places
-      </Title>
+      <Group justify="space-between" mb="md">
+        <Title order={2}>Places</Title>
+        <Button leftSection={<IconPlus size={16} />} onClick={() => setModalOpened(true)}>
+          New place
+        </Button>
+      </Group>
       <Paper withBorder p="md">
         <Table striped highlightOnHover>
           <Table.Thead>
@@ -100,7 +147,13 @@ export function PlacesIndex() {
             ))}
           </Table.Tbody>
         </Table>
+        {places?.length === 0 && (
+          <Text c="dimmed" size="sm" mt="sm">
+            No places yet.
+          </Text>
+        )}
       </Paper>
+      <NewPlaceModal opened={modalOpened} onClose={() => setModalOpened(false)} />
     </>
   )
 }
