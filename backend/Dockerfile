@@ -9,6 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# On x86_64, PaddleX auto-enables its oneDNN ("mkldnn") CPU-acceleration path,
+# which hits an unimplemented PIR op conversion for this model at inference
+# time ("ConvertPirAttribute2RuntimeAttribute not support ..."). Disabling the
+# auto-enable falls back to plain (slower, but correct) CPU inference. Doesn't
+# affect arm64 (e.g. local Apple Silicon dev), where oneDNN never applies.
+ENV PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=False
+
 WORKDIR /app
 
 COPY requirements.txt .
