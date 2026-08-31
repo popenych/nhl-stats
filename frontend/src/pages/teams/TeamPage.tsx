@@ -331,7 +331,12 @@ export function TeamPage() {
       </Paper>
 
       <GamesMiniTable
-        filters={{ team_id: teamId, season_id: seasonIdNum, place_id: placeIdNum }}
+        filters={{
+          team_id: teamId,
+          season_id: seasonIdNum,
+          place_id: placeIdNum,
+          side: sideFilter,
+        }}
         highlightTeamId={teamId}
       />
     </Stack>

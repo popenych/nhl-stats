@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession
+from app.models.game_side import Side
 from app.models.team import Team
 from app.ocr.pipeline import OCR_SEMAPHORE, extract_stats
 from app.schemas.game import GameCreate, GameListResponse, GameOut, GameUpdate
@@ -65,6 +66,7 @@ async def list_games(
     place_id: int | None = None,
     date_from: date_ | None = None,
     date_to: date_ | None = None,
+    side: Side | None = None,
     sort: str = Query("date_desc", pattern="^(date_desc|date_asc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -77,6 +79,7 @@ async def list_games(
         place_id=place_id,
         date_from=date_from,
         date_to=date_to,
+        side=side,
         sort_desc=(sort == "date_desc"),
         page=page,
         page_size=page_size,

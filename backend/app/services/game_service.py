@@ -102,16 +102,23 @@ def _filtered_games_query(
     place_id: int | None,
     date_from: date_ | None,
     date_to: date_ | None,
+    side: Side | None = None,
 ) -> Select[tuple[Game]]:
     query = select(Game)
     if player_id is not None:
-        query = query.where(
-            Game.id.in_(select(GameSide.game_id).where(GameSide.player_id == player_id))
-        )
+        subquery = select(GameSide.game_id).where(GameSide.player_id == player_id)
+        # side means "this player's side" when a player is given — matching
+        # how side filtering works everywhere else (stats_service's `_Result`
+        # "own" side) — not "team_id's side", even if team_id is also given.
+        if side is not None:
+            subquery = subquery.where(GameSide.side == side)
+        query = query.where(Game.id.in_(subquery))
     if team_id is not None:
-        query = query.where(
-            Game.id.in_(select(GameSide.game_id).where(GameSide.team_id == team_id))
-        )
+        subquery = select(GameSide.game_id).where(GameSide.team_id == team_id)
+        # No player given — side describes this team's own side instead.
+        if side is not None and player_id is None:
+            subquery = subquery.where(GameSide.side == side)
+        query = query.where(Game.id.in_(subquery))
     if season_id is not None:
         query = query.where(Game.season_id == season_id)
     if place_id is not None:
@@ -132,6 +139,7 @@ async def list_games(
     place_id: int | None = None,
     date_from: date_ | None = None,
     date_to: date_ | None = None,
+    side: Side | None = None,
     sort_desc: bool = True,
     page: int = 1,
     page_size: int = 20,
@@ -143,6 +151,7 @@ async def list_games(
         place_id=place_id,
         date_from=date_from,
         date_to=date_to,
+        side=side,
     )
 
     total = (await db.execute(select(func.count()).select_from(base_query.subquery()))).scalar_one()

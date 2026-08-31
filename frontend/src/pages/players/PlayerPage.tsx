@@ -453,6 +453,12 @@ export function PlayerPage() {
             season_id: seasonIdNum,
             team_id: teamIdMeNum,
             place_id: placeIdNum,
+            side: sideFilter,
+            // opponentId narrows client-side (see GamesMiniTable) rather than
+            // via a server-side query — the default page size (20) would
+            // silently drop shared games older than the player's 20 most
+            // recent, so fetch the max page instead whenever it's active.
+            page_size: opponentId ? 100 : undefined,
           }}
           highlightPlayerId={playerId}
           opponentId={opponentId ? Number(opponentId) : undefined}

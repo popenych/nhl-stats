@@ -137,6 +137,49 @@ async def test_list_games_filters_by_player(client: AsyncClient, db: AsyncSessio
     assert len(body["items"]) == 1
 
 
+async def test_list_games_filters_by_side(client: AsyncClient, db: AsyncSession) -> None:
+    """side means "this player's side" when player_id is given — regression
+    for the Home/Guest filter never applying to any of the app's "recent
+    games" widgets, since GET /games never accepted a side param at all."""
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+    await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/2.jpg",
+            "home": _side_payload(friend.player_id, ref["home_team_id"], goals=3),
+            "away": _side_payload(alex.player_id, ref["away_team_id"], goals=0),
+        },
+    )
+
+    home_res = await client.get(
+        "/games", params={"player_id": alex.player_id, "side": "home"}
+    )
+    away_res = await client.get(
+        "/games", params={"player_id": alex.player_id, "side": "away"}
+    )
+
+    assert home_res.json()["total"] == 1
+    assert home_res.json()["items"][0]["home"]["player"]["name"] == "Alex"
+    assert away_res.json()["total"] == 1
+    assert away_res.json()["items"][0]["away"]["player"]["name"] == "Alex"
+
+
 async def test_non_participant_member_cannot_edit_game(
     client: AsyncClient, db: AsyncSession
 ) -> None:

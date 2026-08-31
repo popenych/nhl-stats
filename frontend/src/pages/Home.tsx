@@ -310,6 +310,7 @@ export function Home() {
             season_id: seasonIdNum,
             team_id: teamIdNum,
             place_id: placeIdNum,
+            side: sideFilter,
             page_size: 10,
           }}
           highlightPlayerId={user?.player.id}

@@ -6,6 +6,7 @@ import type {
   GameCreateInput,
   GameListResponse,
   GameUpdateInput,
+  SideFilter,
 } from './types'
 
 export interface GameFilters {
@@ -15,6 +16,7 @@ export interface GameFilters {
   place_id?: number
   date_from?: string
   date_to?: string
+  side?: SideFilter
   sort?: 'date_desc' | 'date_asc'
   page?: number
   page_size?: number
