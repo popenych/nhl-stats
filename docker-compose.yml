@@ -36,7 +36,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
+      # 443 isn't mapped by default — bare-IP deploys have no TLS cert to serve
+      # (and Caddy would otherwise fail to start if the port is already taken,
+      # e.g. by an existing VPN service on this host). Re-add "443:443" here
+      # once a real domain is set up — see docs/DEPLOY.md.
     volumes:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data

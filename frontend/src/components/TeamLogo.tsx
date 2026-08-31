@@ -10,6 +10,11 @@ export function TeamLogo({ team, size = 24 }: { team: Team; size?: number }) {
       alt={team.abbreviation}
       size={size}
       radius="sm"
+      bg="white"
+      styles={{
+        image: { padding: Math.round(size * 0.15), objectFit: 'contain' },
+        placeholder: { backgroundColor: 'white', color: 'black' },
+      }}
     >
       {team.abbreviation.slice(0, 2)}
     </Avatar>

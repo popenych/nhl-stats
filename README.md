@@ -62,10 +62,5 @@ logs a clear config error and retries the next day rather than crash-looping.
 
 ### Deploying to the VPS
 
-1. Copy the repo to the VPS, `cp .env.example .env` and fill it in for real (long random
-   `JWT_SECRET`, `CORS_ORIGINS` if needed, Yandex backup creds).
-2. Replace the `:80` placeholder in `infra/Caddyfile` with your real domain — Caddy then handles
-   HTTPS automatically.
-3. Set up `infra/rclone/rclone.conf` for backups (see above).
-4. `docker compose up -d --build`, then bootstrap the first admin as above.
-5. Test a restore at least once — see `infra/backup/restore.sh`.
+Full step-by-step walkthrough (Docker install, `.env`/rclone setup, bare-IP vs. domain, gotchas
+found while first setting this up): see [`docs/DEPLOY.md`](docs/DEPLOY.md).
