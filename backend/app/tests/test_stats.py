@@ -253,6 +253,75 @@ async def test_team_extras_streaks_and_player_breakdown(db: AsyncSession, scenar
     assert extras.most_losses_player.losses == 1
 
 
+async def test_player_extras_includes_game_records(db: AsyncSession, scenario: dict) -> None:
+    """g1 alex 3-1 (best diff +2, best GF), g3 alex 1-4 (worst diff -3,
+    worst GA) — g2's 2-2 tie is neither extreme."""
+    extras = await stats_service.player_extras(db, scenario["alex_id"])
+
+    assert extras.best_diff_game is not None
+    assert extras.best_diff_game.diff == 2
+    assert extras.best_diff_game.own_goals == 3
+    assert extras.best_diff_game.opp_goals == 1
+
+    assert extras.worst_diff_game is not None
+    assert extras.worst_diff_game.diff == -3
+    assert extras.worst_diff_game.own_goals == 1
+    assert extras.worst_diff_game.opp_goals == 4
+
+    assert extras.best_gf_game is not None
+    assert extras.best_gf_game.own_goals == 3
+
+    assert extras.worst_ga_game is not None
+    assert extras.worst_ga_game.opp_goals == 4
+
+
+async def test_team_extras_includes_game_records(db: AsyncSession, scenario: dict) -> None:
+    extras = await stats_service.team_extras(db, scenario["team_a_id"])
+
+    assert extras.best_diff_game is not None
+    assert extras.best_diff_game.diff == 2
+    assert extras.worst_diff_game is not None
+    assert extras.worst_diff_game.diff == -3
+
+
+async def test_player_team_extras_scopes_to_one_player_and_team(
+    db: AsyncSession, scenario: dict
+) -> None:
+    """Alex wore team_a in games 1 (win, diff +2) and 3 (loss, diff -3) only
+    — game 2 (tie, as team_b) is excluded. No most_X fields: nothing to
+    compare once both player and team are fixed."""
+    extras = await stats_service.player_team_extras(db, scenario["alex_id"], scenario["team_a_id"])
+
+    assert extras.best_win_streak == 1
+    assert extras.worst_lose_streak == 1
+    assert extras.most_played_player is None
+    assert extras.most_wins_player is None
+    assert extras.most_losses_player is None
+    assert extras.best_diff_game is not None
+    assert extras.best_diff_game.diff == 2
+    assert extras.worst_diff_game is not None
+    assert extras.worst_diff_game.diff == -3
+
+
+async def test_head_to_head_extras_scoped_to_shared_games(db: AsyncSession, scenario: dict) -> None:
+    """Alex and friend's only games are the 3 shared ones in `scenario`, so
+    h2h-scoped extras should equal each player's own overall extras."""
+    h2h = await stats_service.head_to_head(db, scenario["alex_id"], scenario["friend_id"])
+
+    assert h2h.player_a_extras.best_win_streak == 1
+    assert h2h.player_a_extras.worst_lose_streak == 1
+    assert h2h.player_a_extras.best_diff_game is not None
+    assert h2h.player_a_extras.best_diff_game.diff == 2
+    assert h2h.player_a_extras.most_played_team is not None
+    assert h2h.player_a_extras.most_played_team.team.abbreviation == "OTT"
+
+    # player_b (friend) perspective: g1 loss (diff -2), g2 tie, g3 win (diff +3).
+    assert h2h.player_b_extras.best_diff_game is not None
+    assert h2h.player_b_extras.best_diff_game.diff == 3
+    assert h2h.player_b_extras.worst_diff_game is not None
+    assert h2h.player_b_extras.worst_diff_game.diff == -2
+
+
 def test_streaks_finds_longest_run_anywhere_in_sequence() -> None:
     from types import SimpleNamespace
 
@@ -263,6 +332,7 @@ def test_streaks_finds_longest_run_anywhere_in_sequence() -> None:
             date=date(2026, 1, 1),
             own=SimpleNamespace(goals=own_goals),  # type: ignore[arg-type]
             opp=SimpleNamespace(goals=opp_goals),  # type: ignore[arg-type]
+            game_id=0,
         )
 
     # W W L L L T W W W  -> best win streak 3, worst lose streak 3

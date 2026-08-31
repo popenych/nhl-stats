@@ -11,12 +11,27 @@ const THICK_BORDER: CSSProperties = {
   borderLeft: '2px solid var(--mantine-color-default-border)',
 }
 
-export interface CompareColumn {
+export interface CompareColumn<TExtras = never> {
   header: ReactNode
   summary: StatsSummary | undefined
+  // Records data for this column (streaks, most-played-with, best/worst
+  // game) — rendered by `extraRows` below the Last 5 row. Optional: a
+  // column with no extras support (or none loaded yet) just renders "—".
+  extras?: TExtras
   // Draws a heavier left border before this column — used to visually
   // separate an "own stats" column from a group of compared columns.
   thickBorderBefore?: boolean
+}
+
+// One row in the records section — same shape as StatField's icon/label,
+// but `render` takes the column's `extras` value (a page-specific type,
+// e.g. PlayerExtras or TeamExtras) instead of a StatsSummary, since records
+// aren't part of the StatField/metric registry.
+export interface ExtraRow<TExtras> {
+  key: string
+  icon: ReactNode
+  label: string
+  render: (extras: TExtras | undefined) => ReactNode
 }
 
 // Shared N-column stat table: one row per stat, one column per entity being
@@ -27,18 +42,20 @@ export interface CompareColumn {
 // colored. `highlightMode: 'green-only'` skips coloring the losers, for a
 // 3-way compare where "worse than the other two" isn't a meaningful single
 // verdict the way it is head-to-head.
-export function StatsCompareTable({
+export function StatsCompareTable<TExtras = never>({
   rows,
   columns,
   highlightIndices,
   highlightMode,
   minWidth = 400,
+  extraRows,
 }: {
   rows: StatField[]
-  columns: CompareColumn[]
+  columns: CompareColumn<TExtras>[]
   highlightIndices: number[]
   highlightMode: 'green-only' | 'green-red'
   minWidth?: number
+  extraRows?: ExtraRow<TExtras>[]
 }) {
   return (
     <Table.ScrollContainer minWidth={minWidth}>
@@ -126,6 +143,27 @@ export function StatsCompareTable({
               </Table.Td>
             ))}
           </Table.Tr>
+          {extraRows?.map((row) => (
+            <Table.Tr key={row.key}>
+              <Table.Td>
+                <Group gap={4} wrap="nowrap">
+                  {row.icon}
+                  <Text size="sm" c="dimmed">
+                    {row.label}
+                  </Text>
+                </Group>
+              </Table.Td>
+              {columns.map((col, i) => (
+                <Table.Td
+                  key={i}
+                  ta="right"
+                  style={col.thickBorderBefore ? THICK_BORDER : undefined}
+                >
+                  {row.render(col.extras)}
+                </Table.Td>
+              ))}
+            </Table.Tr>
+          ))}
         </Table.Tbody>
       </Table>
     </Table.ScrollContainer>

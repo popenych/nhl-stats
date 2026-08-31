@@ -129,27 +129,24 @@ class PlaceSummary(BaseModel):
     standings: list[PlaceStanding]
 
 
-class HeadToHeadOut(BaseModel):
-    player_a: PlayerOut
-    player_b: PlayerOut
-    games_played: int
-    player_a_wins: int
-    player_b_wins: int
-    ties: int
-    player_a_goals_for: int
-    player_b_goals_for: int
-    # Full stat breakdowns computed only from the games between these two
-    # players (not each player's overall record) — backs the side-by-side
-    # head-to-head comparison table.
-    player_a_summary: StatsSummary
-    player_b_summary: StatsSummary
-
-
 class TeamRecord(BaseModel):
     team: TeamOut
     games_played: int
     wins: int
     losses: int
+
+
+class GameRecord(BaseModel):
+    """A single standout game, for the "best/worst game" record rows — links
+    out to that game via `game_id`."""
+
+    game_id: int
+    date: str
+    own_team: TeamOut
+    opp_team: TeamOut
+    own_goals: int
+    opp_goals: int
+    diff: int
 
 
 class PlayerExtras(BaseModel):
@@ -158,6 +155,10 @@ class PlayerExtras(BaseModel):
     most_played_team: TeamRecord | None
     most_wins_team: TeamRecord | None
     most_losses_team: TeamRecord | None
+    best_diff_game: GameRecord | None
+    worst_diff_game: GameRecord | None
+    best_gf_game: GameRecord | None
+    worst_ga_game: GameRecord | None
 
 
 class PlayerRecord(BaseModel):
@@ -173,6 +174,30 @@ class TeamExtras(BaseModel):
     most_played_player: PlayerRecord | None
     most_wins_player: PlayerRecord | None
     most_losses_player: PlayerRecord | None
+    best_diff_game: GameRecord | None
+    worst_diff_game: GameRecord | None
+    best_gf_game: GameRecord | None
+    worst_ga_game: GameRecord | None
+
+
+class HeadToHeadOut(BaseModel):
+    player_a: PlayerOut
+    player_b: PlayerOut
+    games_played: int
+    player_a_wins: int
+    player_b_wins: int
+    ties: int
+    player_a_goals_for: int
+    player_b_goals_for: int
+    # Full stat breakdowns computed only from the games between these two
+    # players (not each player's overall record) — backs the side-by-side
+    # head-to-head comparison table.
+    player_a_summary: StatsSummary
+    player_b_summary: StatsSummary
+    # Same idea for streaks/records (best win streak, most-played-team,
+    # best/worst game, etc.) — computed only from the shared games.
+    player_a_extras: PlayerExtras
+    player_b_extras: PlayerExtras
 
 
 class LeaderboardEntry(BaseModel):

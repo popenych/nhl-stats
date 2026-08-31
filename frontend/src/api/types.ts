@@ -223,12 +223,26 @@ export interface TeamRecord {
   losses: number
 }
 
+export interface GameRecord {
+  game_id: number
+  date: string
+  own_team: Team
+  opp_team: Team
+  own_goals: number
+  opp_goals: number
+  diff: number
+}
+
 export interface PlayerExtras {
   best_win_streak: number
   worst_lose_streak: number
   most_played_team: TeamRecord | null
   most_wins_team: TeamRecord | null
   most_losses_team: TeamRecord | null
+  best_diff_game: GameRecord | null
+  worst_diff_game: GameRecord | null
+  best_gf_game: GameRecord | null
+  worst_ga_game: GameRecord | null
 }
 
 export interface PlayerRecord {
@@ -244,6 +258,10 @@ export interface TeamExtras {
   most_played_player: PlayerRecord | null
   most_wins_player: PlayerRecord | null
   most_losses_player: PlayerRecord | null
+  best_diff_game: GameRecord | null
+  worst_diff_game: GameRecord | null
+  best_gf_game: GameRecord | null
+  worst_ga_game: GameRecord | null
 }
 
 export interface PlaceStanding {
@@ -270,6 +288,8 @@ export interface HeadToHead {
   player_b_goals_for: number
   player_a_summary: StatsSummary
   player_b_summary: StatsSummary
+  player_a_extras: PlayerExtras
+  player_b_extras: PlayerExtras
 }
 
 export interface LeaderboardEntry {

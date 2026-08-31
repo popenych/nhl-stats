@@ -46,6 +46,17 @@ export function getPlayerExtras(
   )
 }
 
+export function getPlayerTeamExtras(
+  playerId: number,
+  teamId: number,
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<TeamExtras>(
+    `/stats/players/${playerId}/team-extras${qs({ team_id: teamId, season_id: seasonId, place_id: placeId, side })}`,
+  )
+}
+
 export function getPlayerTeamBreakdown(
   playerId: number,
   options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},

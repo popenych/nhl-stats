@@ -2,7 +2,16 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, Group, Paper, Select, Stack, Table, Text, TextInput, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { IconFlame, IconSnowflake, IconTrophy, IconUsers, IconX } from '@tabler/icons-react'
+import {
+  IconFlame,
+  IconSnowflake,
+  IconTarget,
+  IconTrendingDown,
+  IconTrendingUp,
+  IconTrophy,
+  IconUsers,
+  IconX,
+} from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as placesApi from '../../api/places'
@@ -10,12 +19,19 @@ import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as statsApi from '../../api/stats'
 import * as teamsApi from '../../api/teams'
-import type { MetricKey, PlayerTeamSummaryRow, SideFilter, TeamRecord } from '../../api/types'
+import type {
+  MetricKey,
+  PlayerExtras,
+  PlayerTeamSummaryRow,
+  SideFilter,
+  TeamRecord,
+} from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
+import { GameRecordCell } from '../../components/GameRecordCell'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
 import { Last5 } from '../../components/Last5'
 import { StatHeader } from '../../components/StatHeader'
-import type { CompareColumn } from '../../components/StatsCompareTable'
+import type { CompareColumn, ExtraRow } from '../../components/StatsCompareTable'
 import { StatsCompareTable } from '../../components/StatsCompareTable'
 import { TeamLogo } from '../../components/TeamLogo'
 import { TrendChart } from '../../components/TrendChart'
@@ -51,6 +67,67 @@ function TeamRecordValue({ record }: { record: TeamRecord | null }) {
     </Group>
   )
 }
+
+// Records section for the player compare table (own overall / vs opponent /
+// opponent) — every row keyed off PlayerExtras, since all three columns
+// share that shape (h2h-scoped extras are still "one player's own results,
+// just narrowed to shared games" — see stats_service._build_player_extras).
+const PLAYER_EXTRAS_ROWS: ExtraRow<PlayerExtras>[] = [
+  {
+    key: 'best_win_streak',
+    icon: <IconFlame size={14} />,
+    label: 'Best win streak',
+    render: (e) => e?.best_win_streak ?? '—',
+  },
+  {
+    key: 'worst_lose_streak',
+    icon: <IconSnowflake size={14} />,
+    label: 'Worst lose streak',
+    render: (e) => e?.worst_lose_streak ?? '—',
+  },
+  {
+    key: 'most_played_team',
+    icon: <IconUsers size={14} />,
+    label: 'Most GP with',
+    render: (e) => <TeamRecordValue record={e?.most_played_team ?? null} />,
+  },
+  {
+    key: 'most_wins_team',
+    icon: <IconTrophy size={14} />,
+    label: 'Most wins with',
+    render: (e) => <TeamRecordValue record={e?.most_wins_team ?? null} />,
+  },
+  {
+    key: 'most_losses_team',
+    icon: <IconX size={14} />,
+    label: 'Most losses with',
+    render: (e) => <TeamRecordValue record={e?.most_losses_team ?? null} />,
+  },
+  {
+    key: 'best_diff_game',
+    icon: <IconTrendingUp size={14} />,
+    label: 'Best game (diff)',
+    render: (e) => <GameRecordCell record={e?.best_diff_game ?? null} mode="diff" />,
+  },
+  {
+    key: 'worst_diff_game',
+    icon: <IconTrendingDown size={14} />,
+    label: 'Worst game (diff)',
+    render: (e) => <GameRecordCell record={e?.worst_diff_game ?? null} mode="diff" />,
+  },
+  {
+    key: 'best_gf_game',
+    icon: <IconTarget size={14} />,
+    label: 'Best game (GF)',
+    render: (e) => <GameRecordCell record={e?.best_gf_game ?? null} mode="gf" />,
+  },
+  {
+    key: 'worst_ga_game',
+    icon: <IconX size={14} />,
+    label: 'Worst game (GA)',
+    render: (e) => <GameRecordCell record={e?.worst_ga_game ?? null} mode="ga" />,
+  },
+]
 
 // Rows = every team this player has worn, each with its own full stats —
 // shaped like the Home leaderboard, but keyed by team instead of by player.
@@ -245,8 +322,8 @@ export function PlayerPage() {
   const selectedTeamMe = (teams ?? []).find((t) => String(t.id) === teamIdMe)
   const selectedTeamOpponent = (teams ?? []).find((t) => String(t.id) === teamIdOpponent)
 
-  const compareColumns: CompareColumn[] = [
-    { header: <Text fw={700}>{player.name} overall</Text>, summary: summary },
+  const compareColumns: CompareColumn<PlayerExtras>[] = [
+    { header: <Text fw={700}>{player.name} overall</Text>, summary: summary, extras: extras },
     {
       header: (
         <Text fw={700} size="sm">
@@ -254,6 +331,7 @@ export function PlayerPage() {
         </Text>
       ),
       summary: h2h?.player_a_summary,
+      extras: h2h?.player_a_extras,
       thickBorderBefore: true,
     },
     {
@@ -267,6 +345,7 @@ export function PlayerPage() {
         />
       ),
       summary: h2h?.player_b_summary,
+      extras: h2h?.player_b_extras,
     },
   ]
 
@@ -360,57 +439,13 @@ export function PlayerPage() {
         </Group>
       </Paper>
 
-      {extras && (
-        <Paper withBorder p="md">
-          <Title order={4} mb="sm">
-            Team Records
-          </Title>
-          <Stack gap="xs">
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconFlame size={14} />
-                <Text size="sm">Best win streak</Text>
-              </Group>
-              <Text fw={700}>{extras.best_win_streak}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconSnowflake size={14} />
-                <Text size="sm">Worst lose streak</Text>
-              </Group>
-              <Text fw={700}>{extras.worst_lose_streak}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconUsers size={14} />
-                <Text size="sm">Most GP with</Text>
-              </Group>
-              <TeamRecordValue record={extras.most_played_team} />
-            </Group>
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconTrophy size={14} />
-                <Text size="sm">Most wins with</Text>
-              </Group>
-              <TeamRecordValue record={extras.most_wins_team} />
-            </Group>
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconX size={14} />
-                <Text size="sm">Most losses with</Text>
-              </Group>
-              <TeamRecordValue record={extras.most_losses_team} />
-            </Group>
-          </Stack>
-        </Paper>
-      )}
-
       <Paper withBorder p="md">
         <Title order={4} mb="sm">
           Stats
         </Title>
         <StatsCompareTable
           rows={COMPARE_TABLE_ROWS}
+          extraRows={PLAYER_EXTRAS_ROWS}
           columns={compareColumns}
           highlightIndices={[1, 2]}
           highlightMode="green-red"

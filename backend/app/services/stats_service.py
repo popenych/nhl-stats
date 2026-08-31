@@ -11,6 +11,7 @@ from app.models.player import Player
 from app.models.team import Team
 from app.schemas.player import PlayerOut
 from app.schemas.stats import (
+    GameRecord,
     HeadToHeadOut,
     LeaderboardEntry,
     LeaderboardResponse,
@@ -38,6 +39,7 @@ class _Result:
     date: date_
     own: GameSide
     opp: GameSide
+    game_id: int
 
 
 def _outcome(r: _Result) -> str:
@@ -55,7 +57,7 @@ def _split_by_player(games: list[Game], player_id: int) -> list[_Result]:
         if own is None:
             continue
         opp = next(s for s in game.sides if s is not own)
-        results.append(_Result(date=game.date, own=own, opp=opp))
+        results.append(_Result(date=game.date, own=own, opp=opp, game_id=game.id))
     return results
 
 
@@ -66,7 +68,7 @@ def _split_by_team(games: list[Game], team_id: int) -> list[_Result]:
         if own is None:
             continue
         opp = next(s for s in game.sides if s is not own)
-        results.append(_Result(date=game.date, own=own, opp=opp))
+        results.append(_Result(date=game.date, own=own, opp=opp, game_id=game.id))
     return results
 
 
@@ -120,6 +122,37 @@ def _streaks(results: list[_Result]) -> tuple[int, int]:
             cur_win = 0
             cur_lose = 0
     return best_win, worst_lose
+
+
+def _to_game_record(r: _Result) -> GameRecord:
+    return GameRecord(
+        game_id=r.game_id,
+        date=str(r.date),
+        own_team=TeamOut.model_validate(r.own.team),
+        opp_team=TeamOut.model_validate(r.opp.team),
+        own_goals=r.own.goals,
+        opp_goals=r.opp.goals,
+        diff=r.own.goals - r.opp.goals,
+    )
+
+
+def _game_records(
+    results: list[_Result],
+) -> tuple[GameRecord | None, GameRecord | None, GameRecord | None, GameRecord | None]:
+    """Best/worst game by goal diff, best game by goals for, worst game by
+    goals against — each a link out to that specific game."""
+    if not results:
+        return None, None, None, None
+    best_diff = max(results, key=lambda r: r.own.goals - r.opp.goals)
+    worst_diff = min(results, key=lambda r: r.own.goals - r.opp.goals)
+    best_gf = max(results, key=lambda r: r.own.goals)
+    worst_ga = max(results, key=lambda r: r.opp.goals)
+    return (
+        _to_game_record(best_diff),
+        _to_game_record(worst_diff),
+        _to_game_record(best_gf),
+        _to_game_record(worst_ga),
+    )
 
 
 def summarize(results: list[_Result]) -> StatsSummary:
@@ -242,17 +275,13 @@ async def player_summary(
     return summarize(results)
 
 
-async def player_extras(
-    db: AsyncSession,
-    player_id: int,
-    *,
-    season_id: int | None = None,
-    place_id: int | None = None,
-    side: SideFilter | None = None,
-) -> PlayerExtras:
-    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
-    results = _filter_by_side(_split_by_player(games, player_id), side)
+def _build_player_extras(results: list[_Result]) -> PlayerExtras:
+    """Streaks, most-played/wins/losses-with-a-team, and best/worst games —
+    from an arbitrary list of a player's own results. Reused for both a
+    player's overall extras and a head-to-head pair's shared-games extras
+    (same shape, narrower input)."""
     best_win_streak, worst_lose_streak = _streaks(results)
+    best_diff, worst_diff, best_gf, worst_ga = _game_records(results)
 
     by_team, teams = _group_by_team(results)
 
@@ -278,6 +307,56 @@ async def player_extras(
         most_played_team=most_played,
         most_wins_team=most_wins,
         most_losses_team=most_losses,
+        best_diff_game=best_diff,
+        worst_diff_game=worst_diff,
+        best_gf_game=best_gf,
+        worst_ga_game=worst_ga,
+    )
+
+
+async def player_extras(
+    db: AsyncSession,
+    player_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> PlayerExtras:
+    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_player(games, player_id), side)
+    return _build_player_extras(results)
+
+
+async def player_team_extras(
+    db: AsyncSession,
+    player_id: int,
+    team_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> TeamExtras:
+    """Streaks + best/worst games for one player while wearing one specific
+    team — backs a per-player column on the team page, mirroring how
+    player_summary(..., team_id=...) scopes the stats grid. Reuses the
+    TeamExtras shape (most_played/wins/losses_player left null — there's
+    nothing to vary once both player and team are fixed)."""
+    games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    results = [r for r in _split_by_player(games, player_id) if r.own.team_id == team_id]
+    results = _filter_by_side(results, side)
+    best_win_streak, worst_lose_streak = _streaks(results)
+    best_diff, worst_diff, best_gf, worst_ga = _game_records(results)
+
+    return TeamExtras(
+        best_win_streak=best_win_streak,
+        worst_lose_streak=worst_lose_streak,
+        most_played_player=None,
+        most_wins_player=None,
+        most_losses_player=None,
+        best_diff_game=best_diff,
+        worst_diff_game=worst_diff,
+        best_gf_game=best_gf,
+        worst_ga_game=worst_ga,
     )
 
 
@@ -330,6 +409,7 @@ async def team_extras(
     games = await list_all_games(db, team_id=team_id, season_id=season_id, place_id=place_id)
     results = _filter_by_side(_split_by_team(games, team_id), side)
     best_win_streak, worst_lose_streak = _streaks(results)
+    best_diff, worst_diff, best_gf, worst_ga = _game_records(results)
 
     by_player: dict[int, list[_Result]] = {}
     players: dict[int, Player] = {}
@@ -359,6 +439,10 @@ async def team_extras(
         most_played_player=most_played,
         most_wins_player=most_wins,
         most_losses_player=most_losses,
+        best_diff_game=best_diff,
+        worst_diff_game=worst_diff,
+        best_gf_game=best_gf,
+        worst_ga_game=worst_ga,
     )
 
 
@@ -373,7 +457,7 @@ async def place_summary(
         for side in game.sides:
             opp = next(s for s in game.sides if s is not side)
             by_player.setdefault(side.player_id, []).append(
-                _Result(date=game.date, own=side, opp=opp)
+                _Result(date=game.date, own=side, opp=opp, game_id=game.id)
             )
             players[side.player_id] = side.player
 
@@ -405,9 +489,7 @@ async def head_to_head(
     team_id_b: int | None = None,
     side: SideFilter | None = None,
 ) -> HeadToHeadOut:
-    games = await list_all_games(
-        db, player_id=player_a_id, season_id=season_id, place_id=place_id
-    )
+    games = await list_all_games(db, player_id=player_a_id, season_id=season_id, place_id=place_id)
     games = [g for g in games if any(s.player_id == player_b_id for s in g.sides)]
 
     def side_for(game: Game, player_id: int) -> GameSide:
@@ -449,6 +531,8 @@ async def head_to_head(
         player_b_goals_for=sum(r.opp.goals for r in results_a),
         player_a_summary=summarize(results_a),
         player_b_summary=summarize(results_b),
+        player_a_extras=_build_player_extras(results_a),
+        player_b_extras=_build_player_extras(results_b),
     )
 
 
@@ -472,7 +556,7 @@ async def _group_all_players(
                 continue
             opp = next(s for s in game.sides if s is not game_side)
             by_player.setdefault(game_side.player_id, []).append(
-                _Result(date=game.date, own=game_side, opp=opp)
+                _Result(date=game.date, own=game_side, opp=opp, game_id=game.id)
             )
             players[game_side.player_id] = game_side.player
 
@@ -558,7 +642,7 @@ async def trend(
                 continue
             opp = next(s for s in game.sides if s is not game_side)
             by_player.setdefault(game_side.player_id, []).append(
-                _Result(date=game.date, own=game_side, opp=opp)
+                _Result(date=game.date, own=game_side, opp=opp, game_id=game.id)
             )
             players[game_side.player_id] = game_side.player
 

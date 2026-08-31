@@ -50,6 +50,21 @@ async def get_player_extras(
     )
 
 
+@router.get("/players/{player_id}/team-extras", response_model=TeamExtras)
+async def get_player_team_extras(
+    player_id: int,
+    db: DbSession,
+    _user: CurrentUser,
+    team_id: int = Query(...),
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> object:
+    return await stats_service.player_team_extras(
+        db, player_id, team_id, season_id=season_id, place_id=place_id, side=side
+    )
+
+
 @router.get("/players/{player_id}/by-team", response_model=list[PlayerTeamSummaryRow])
 async def get_player_team_breakdown(
     player_id: int,
