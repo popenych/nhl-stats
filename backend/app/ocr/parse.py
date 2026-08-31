@@ -6,11 +6,22 @@ _PCT_RE = re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%?")
 _FRACTION_RE = re.compile(r"(\d+)\s*/\s*(\d+)")
 
 
+# No per-game counting stat here (shots, hits, faceoffs won, goals, shorthanded
+# goals) plausibly reaches 3 digits. This catches the real failure mode where
+# the detector merges two adjacent rows' values into one box — e.g. away
+# shots "14" + away hits "25" read as a single "1425" — rather than silently
+# accepting an impossible reading as if it were a confident, correct one.
+MAX_PLAUSIBLE_INT = 99
+
+
 def parse_int(text: str) -> int | None:
     match = _INT_RE.search(text)
     if not match:
         return None
-    return int(match.group(1))
+    value = int(match.group(1))
+    if value > MAX_PLAUSIBLE_INT:
+        return None
+    return value
 
 
 def parse_mmss(text: str) -> int | None:

@@ -33,12 +33,12 @@ def test_extract_stats_matches_ground_truth(image_id: int, detector: TextDetecto
     _assert_side_matches(result.away, fixture["away"], image_id, "away")
     _assert_side_matches(result.home, fixture["home"], image_id, "home")
 
-    assert result.away_team is not None and result.away_team.value == fixture["away_team"], (
-        f"image {image_id} away_team: got {result.away_team}"
-    )
-    assert result.home_team is not None and result.home_team.value == fixture["home_team"], (
-        f"image {image_id} home_team: got {result.home_team}"
-    )
+    assert (
+        result.away_team is not None and result.away_team.value == fixture["away_team"]
+    ), f"image {image_id} away_team: got {result.away_team}"
+    assert (
+        result.home_team is not None and result.home_team.value == fixture["home_team"]
+    ), f"image {image_id} home_team: got {result.home_team}"
 
 
 def test_all_fields_parse_with_real_confidence(image_id: int, detector: TextDetector) -> None:

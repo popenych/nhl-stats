@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,6 +19,13 @@ from app.ocr.recognize import DetectedText, TextDetector, get_detector
 LOW_CONFIDENCE_CEILING = 0.3  # a field that fails format validation is
 # capped at this confidence regardless of what the OCR engine reported —
 # an implausible reading shouldn't look "confident" to the review UI.
+
+# Running two OCR inferences at once roughly doubles peak memory for the
+# duration of the overlap — a real risk on a small VPS (this is what caused
+# an OOM kill in production). Serializing requests through this semaphore
+# means a second concurrent upload waits in the ASGI event loop rather than
+# running in parallel; it costs latency, not correctness.
+OCR_SEMAPHORE = asyncio.Semaphore(1)
 
 
 @dataclass(frozen=True)

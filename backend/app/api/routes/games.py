@@ -6,7 +6,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.team import Team
-from app.ocr.pipeline import extract_stats
+from app.ocr.pipeline import OCR_SEMAPHORE, extract_stats
 from app.schemas.game import GameCreate, GameListResponse, GameOut, GameUpdate
 from app.schemas.ocr import ExtractResponse, to_extract_response
 from app.services import game_service
@@ -41,8 +41,11 @@ async def extract_game_photo(
     await file.seek(0)
     photo_path = await save_photo(file, "games")
     # PaddleOCR inference is CPU-bound sync work — offload it so it doesn't
-    # block the event loop.
-    result = await run_in_threadpool(extract_stats, contents)
+    # block the event loop. The semaphore keeps concurrent uploads from
+    # running OCR in parallel (real memory-spike/OOM risk on a small VPS) —
+    # a second request just waits its turn instead.
+    async with OCR_SEMAPHORE:
+        result = await run_in_threadpool(extract_stats, contents)
 
     away_team_text = result.away_team.value if result.away_team else None
     home_team_text = result.home_team.value if result.home_team else None

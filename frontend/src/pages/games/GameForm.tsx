@@ -275,7 +275,7 @@ export function GameForm({
             <Group justify="center" py="lg" px="xs">
               <Title order={5} c="dimmed" ta="center">
                 {extractMutation.isPending
-                  ? 'Reading stats from photo — this can take a few seconds…'
+                  ? 'Reading stats from photo — this can take a bit longer if someone else is uploading too…'
                   : 'Tap to take or choose the post-game stats photo'}
               </Title>
             </Group>

@@ -10,6 +10,14 @@ def test_parse_int_invalid() -> None:
     assert parse_int("abc") is None
 
 
+def test_parse_int_rejects_implausibly_large_values() -> None:
+    """Guards against the detector merging two adjacent rows' values into one
+    box (e.g. shots "14" + hits "25" read as a single "1425") — no real
+    per-game counting stat here reaches 3 digits."""
+    assert parse_int("1425") is None
+    assert parse_int("99") == 99
+
+
 def test_parse_mmss_valid() -> None:
     assert parse_mmss("06:41") == 401
     assert parse_mmss("00:00") == 0
