@@ -4,7 +4,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.config import settings
-from app.schemas.auth import LoginRequest
+from app.schemas.auth import ChangePasswordRequest, LoginRequest
 from app.schemas.user import UserOut
 from app.services import auth_service
 
@@ -67,9 +67,7 @@ async def refresh(
     if refresh_token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
-        access_token, new_refresh_token = await auth_service.rotate_refresh_token(
-            db, refresh_token
-        )
+        access_token, new_refresh_token = await auth_service.rotate_refresh_token(db, refresh_token)
     except auth_service.InvalidRefreshTokenError as exc:
         _clear_auth_cookies(response)
         raise HTTPException(
@@ -95,3 +93,18 @@ async def logout(
 @router.get("/me", response_model=UserOut)
 async def me(user: CurrentUser) -> object:
     return user
+
+
+@router.post("/change-password")
+async def change_password(
+    data: ChangePasswordRequest, db: DbSession, user: CurrentUser
+) -> dict[str, str]:
+    try:
+        await auth_service.change_password(
+            db, user, current_password=data.current_password, new_password=data.new_password
+        )
+    except auth_service.InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect"
+        ) from exc
+    return {"status": "ok"}

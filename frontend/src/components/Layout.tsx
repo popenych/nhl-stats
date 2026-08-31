@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
-import { AppShell, Burger, Group, Button, Text, NavLink, Title } from '@mantine/core'
+import { AppShell, Burger, Group, Menu, Text, NavLink, Title, UnstyledButton } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import {
   IconCalendar,
+  IconChevronDown,
   IconHome,
+  IconKey,
   IconLogout,
   IconMapPin,
   IconShirtSport,
@@ -14,12 +16,15 @@ import {
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../auth/auth-context-value'
+import { ChangePasswordModal } from './ChangePasswordModal'
 
 export function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [navOpened, { toggle: toggleNav, close: closeNav }] = useDisclosure()
+  const [passwordModalOpened, { open: openPasswordModal, close: closePasswordModal }] =
+    useDisclosure()
 
   // Close the mobile nav drawer whenever the route changes (e.g. after
   // tapping a nav link) instead of leaving it open over the new page.
@@ -45,19 +50,26 @@ export function Layout() {
             <Burger opened={navOpened} onClick={toggleNav} hiddenFrom="sm" size="sm" />
             <Title order={4}>NHL Stats Tracker</Title>
           </Group>
-          <Group>
-            <Text size="sm" visibleFrom="xs">
-              {user?.player.name}
-            </Text>
-            <Button
-              variant="subtle"
-              size="xs"
-              onClick={handleLogout}
-              leftSection={<IconLogout size={16} />}
-            >
-              Log out
-            </Button>
-          </Group>
+          <Menu position="bottom-end" withArrow>
+            <Menu.Target>
+              <UnstyledButton>
+                <Group gap={4}>
+                  <Text size="sm" visibleFrom="xs">
+                    {user?.player.name}
+                  </Text>
+                  <IconChevronDown size={14} />
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconKey size={14} />} onClick={openPasswordModal}>
+                Change password
+              </Menu.Item>
+              <Menu.Item leftSection={<IconLogout size={14} />} onClick={handleLogout} color="red">
+                Log out
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="md">
@@ -116,6 +128,7 @@ export function Layout() {
       <AppShell.Main>
         <Outlet />
       </AppShell.Main>
+      <ChangePasswordModal opened={passwordModalOpened} onClose={closePasswordModal} />
     </AppShell>
   )
 }

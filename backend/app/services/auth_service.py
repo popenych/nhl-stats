@@ -4,7 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import create_access_token
-from app.auth.security import generate_refresh_token, hash_refresh_token, verify_password
+from app.auth.security import (
+    generate_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
 from app.config import settings
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
@@ -41,8 +46,7 @@ async def issue_tokens(db: AsyncSession, user: User) -> tuple[str, str]:
         RefreshToken(
             user_id=user.id,
             token_hash=hash_refresh_token(refresh_token),
-            expires_at=datetime.now(UTC)
-            + timedelta(days=settings.jwt_refresh_token_expire_days),
+            expires_at=datetime.now(UTC) + timedelta(days=settings.jwt_refresh_token_expire_days),
         )
     )
     await db.commit()
@@ -65,6 +69,15 @@ async def rotate_refresh_token(db: AsyncSession, refresh_token: str) -> tuple[st
         raise InvalidRefreshTokenError
 
     return await issue_tokens(db, user)
+
+
+async def change_password(
+    db: AsyncSession, user: User, *, current_password: str, new_password: str
+) -> None:
+    if not verify_password(current_password, user.password_hash):
+        raise InvalidCredentialsError
+    user.password_hash = hash_password(new_password)
+    await db.commit()
 
 
 async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:

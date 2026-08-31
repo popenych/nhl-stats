@@ -12,3 +12,10 @@ export function logout() {
 export function me() {
   return api.get<User>('/auth/me')
 }
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return api.post<{ status: string }>('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}

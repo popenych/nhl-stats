@@ -53,6 +53,51 @@ async def test_me_returns_current_user_after_login(client: AsyncClient, db: Asyn
     assert res.json()["player"]["name"] == "Alex"
 
 
+async def test_change_password_requires_auth(client: AsyncClient) -> None:
+    res = await client.post(
+        "/auth/change-password",
+        json={"current_password": "hunter2pass", "new_password": "newpass123"},
+    )
+    assert res.status_code == 401
+
+
+async def test_change_password_rejects_wrong_current_password(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    await _create_user(db)
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+
+    res = await client.post(
+        "/auth/change-password",
+        json={"current_password": "wrong", "new_password": "newpass123"},
+    )
+
+    assert res.status_code == 401
+
+
+async def test_change_password_updates_and_allows_relogin(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    await _create_user(db)
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+
+    res = await client.post(
+        "/auth/change-password",
+        json={"current_password": "hunter2pass", "new_password": "newpass123"},
+    )
+    assert res.status_code == 200
+
+    old_login = await client.post(
+        "/auth/login", json={"username": "alex", "password": "hunter2pass"}
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/auth/login", json={"username": "alex", "password": "newpass123"}
+    )
+    assert new_login.status_code == 200
+
+
 async def test_refresh_rotates_token_and_old_one_is_revoked(
     client: AsyncClient, db: AsyncSession
 ) -> None:
