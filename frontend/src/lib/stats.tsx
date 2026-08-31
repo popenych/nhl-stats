@@ -347,8 +347,10 @@ export const METRIC_OPTIONS: { value: MetricKey; label: string }[] = (() => {
 // W%, Record covers Wins/Losses) — the leaderboard/all-time tables' column
 // set, also reused for the player's per-team breakdown table (item 9),
 // which is shaped the same way just keyed by team instead of by player.
+// gf_ga_per_game is also dropped here — GF/GP and GA/GP already cover the
+// same numbers as separate columns, so the combined one was redundant.
 export const LEADERBOARD_COLUMNS: StatField[] = STAT_FIELDS.filter(
-  (f) => !['games_played', 'wins', 'losses', 'win_pct'].includes(f.key),
+  (f) => !['games_played', 'wins', 'losses', 'win_pct', 'gf_ga_per_game'].includes(f.key),
 )
 
 // Sort-by options for any table built from LEADERBOARD_COLUMNS — every
