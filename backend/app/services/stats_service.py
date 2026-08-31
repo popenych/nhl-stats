@@ -566,6 +566,14 @@ async def trend(
     for pid, results in by_player.items():
         points = []
         for i in range(1, len(results) + 1):
+            # By date, a player who logged more than one game on the same
+            # calendar date (date has day granularity only) should show a
+            # single point reflecting their state *after* that day's last
+            # game — not one point per game, which would plot several values
+            # at the same x and let the chart pick whichever happens to
+            # render first rather than the day's actual end state.
+            if x_axis == "date" and i < len(results) and results[i].date == results[i - 1].date:
+                continue
             s = summarize(results[:i])
             x = str(results[i - 1].date) if x_axis == "date" else str(i)
             points.append(TrendPoint(x=x, value=_metric_value(s, metric)))

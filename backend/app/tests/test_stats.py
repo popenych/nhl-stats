@@ -361,6 +361,67 @@ async def test_trend_is_cumulative(db: AsyncSession, scenario: dict) -> None:
     assert points[2].value == pytest.approx(1 / 3)
 
 
+async def test_trend_by_date_collapses_same_day_games_to_last_value(
+    db: AsyncSession, scenario: dict
+) -> None:
+    """Real bug: a player who logs two games on the same calendar date (date
+    has day granularity only) should show one by-date point reflecting their
+    state after *both* games — not stall at whichever game's value the chart
+    happened to pick for that shared x. games_played is unaffected — every
+    game still gets its own point there."""
+    team_a_id = scenario["team_a_id"]
+    same_day = date(2026, 1, 10)
+
+    g4 = Game(
+        date=same_day,
+        season_id=scenario["season_id"],
+        place_id=scenario["place_id"],
+        photo_path="games/4.jpg",
+        created_by_user_id=scenario["alex_id"],
+    )
+    g4_home = _side(
+        scenario["alex_id"], team_a_id, goals=3, shots=10, faceoffs_won=5, pp_goals=0, pp_total=0
+    )
+    g4_home.side = Side.HOME
+    g4_away = _side(
+        scenario["friend_id"], team_a_id, goals=1, shots=8, faceoffs_won=3, pp_goals=0, pp_total=0
+    )
+    g4_away.side = Side.AWAY
+    g4.sides = [g4_home, g4_away]
+
+    g5 = Game(
+        date=same_day,
+        season_id=scenario["season_id"],
+        place_id=scenario["place_id"],
+        photo_path="games/5.jpg",
+        created_by_user_id=scenario["alex_id"],
+    )
+    g5_home = _side(
+        scenario["friend_id"], team_a_id, goals=3, shots=10, faceoffs_won=5, pp_goals=0, pp_total=0
+    )
+    g5_home.side = Side.HOME
+    g5_away = _side(
+        scenario["alex_id"], team_a_id, goals=1, shots=8, faceoffs_won=3, pp_goals=0, pp_total=0
+    )
+    g5_away.side = Side.AWAY
+    g5.sides = [g5_home, g5_away]
+
+    db.add_all([g4, g5])
+    await db.commit()
+
+    by_date = await stats_service.trend(db, "win_pct", "date", player_id=scenario["alex_id"])
+    date_points = by_date.series[0].points
+    assert [p.x for p in date_points] == ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-10"]
+    # 4 games played by this point (1-1 through 1-3), 2 wins so far -> then
+    # the same-day win+loss keeps the win count at 2/5, not stuck at 3/4.
+    assert date_points[-1].value == pytest.approx(2 / 5)
+
+    by_games = await stats_service.trend(
+        db, "win_pct", "games_played", player_id=scenario["alex_id"]
+    )
+    assert [p.x for p in by_games.series[0].points] == ["1", "2", "3", "4", "5"]
+
+
 async def test_place_summary_totals_games(db: AsyncSession, scenario: dict) -> None:
     summary = await stats_service.place_summary(db, scenario["place_id"])
 

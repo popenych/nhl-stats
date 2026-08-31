@@ -147,9 +147,17 @@ async def list_games(
 
     total = (await db.execute(select(func.count()).select_from(base_query.subquery()))).scalar_one()
 
+    # Game.date has day granularity — created_at (and id as a final tiebreak,
+    # in the rare case two games share the same created_at) orders games that
+    # share a date by when they were actually logged, which for live usage
+    # matches the order they were actually played in.
     order = Game.date.desc() if sort_desc else Game.date.asc()
+    created_order = Game.created_at.desc() if sort_desc else Game.created_at.asc()
+    id_order = Game.id.desc() if sort_desc else Game.id.asc()
     items_query = (
-        base_query.order_by(order, Game.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        base_query.order_by(order, created_order, id_order)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     items = (await db.execute(items_query)).scalars().all()
 
@@ -165,7 +173,9 @@ async def list_all_games(
     place_id: int | None = None,
 ) -> list[Game]:
     """Unpaginated, chronological (oldest first) — for stats aggregation,
-    which needs the full matching set rather than a page of it."""
+    which needs the full matching set rather than a page of it. Games sharing
+    a date (day granularity only) are ordered by when they were actually
+    logged (created_at, then id as a final tiebreak) — see list_games."""
     query = _filtered_games_query(
         player_id=player_id,
         team_id=team_id,
@@ -173,5 +183,5 @@ async def list_all_games(
         place_id=place_id,
         date_from=None,
         date_to=None,
-    ).order_by(Game.date.asc(), Game.id.asc())
+    ).order_by(Game.date.asc(), Game.created_at.asc(), Game.id.asc())
     return list((await db.execute(query)).scalars().all())
