@@ -7,7 +7,7 @@ import * as placesApi from '../api/places'
 import * as seasonsApi from '../api/seasons'
 import * as statsApi from '../api/stats'
 import * as teamsApi from '../api/teams'
-import type { MetricKey, PlayerSummaryRow, SideFilter } from '../api/types'
+import type { MetricKey, PlayerSummaryRow, PlayerTeamSummaryRow, SideFilter } from '../api/types'
 import { useAuth } from '../auth/auth-context-value'
 import { GamesMiniTable } from '../components/GamesMiniTable'
 import { Last5 } from '../components/Last5'
@@ -129,6 +129,89 @@ function StandingsTable({
   )
 }
 
+// Same shape as StandingsTable, but rows are teams (aggregated across every
+// player who's worn each one) instead of players — mirrors PlayerPage's
+// "Stats by team" table, just across the whole group instead of one player.
+function TeamStandingsTable({
+  rows,
+  sortBy,
+  onSortChange,
+  minWidth,
+}: {
+  rows: PlayerTeamSummaryRow[]
+  sortBy: string
+  onSortChange: (v: string) => void
+  minWidth: number
+}) {
+  const sorted = sortByField(rows, sortBy)
+  return (
+    <Stack gap="sm">
+      <Group justify="flex-end">
+        <SortSelect fields={SORT_FIELDS} value={sortBy} onChange={onSortChange} />
+      </Group>
+      {sorted.length === 0 ? (
+        <Text c="dimmed" size="sm">
+          No games yet.
+        </Text>
+      ) : (
+        <Table.ScrollContainer minWidth={minWidth}>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th style={STICKY_FIRST_COL}>Team</Table.Th>
+                <Table.Th>GP</Table.Th>
+                <Table.Th>W%</Table.Th>
+                <Table.Th>Record</Table.Th>
+                {LEADERBOARD_COLUMNS.map((col) => (
+                  <Table.Th key={col.key}>
+                    <StatHeader field={col} />
+                  </Table.Th>
+                ))}
+                <Table.Th>Last 5</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {sorted.map((row) => (
+                <Table.Tr key={row.team.id}>
+                  <Table.Td style={STICKY_FIRST_COL}>
+                    <Group gap={6} wrap="nowrap">
+                      <Link to={`/teams/${row.team.id}`}>
+                        <TeamLogo team={row.team} size={20} />
+                      </Link>
+                      <Text component={Link} to={`/teams/${row.team.id}`}>
+                        {row.team.abbreviation}
+                      </Text>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>{row.summary.games_played}</Table.Td>
+                  <Table.Td>{(row.summary.win_pct * 100).toFixed(1)}%</Table.Td>
+                  <Table.Td>
+                    {formatRecord(row.summary.wins, row.summary.losses, row.summary.ties)}
+                  </Table.Td>
+                  {LEADERBOARD_COLUMNS.map((col) =>
+                    col.key === 'goal_diff' ? (
+                      <Table.Td key={col.key}>
+                        <span style={{ color: signColor(row.summary.goal_diff) }}>
+                          {goalDiffField.format(row.summary)}
+                        </span>
+                      </Table.Td>
+                    ) : (
+                      <Table.Td key={col.key}>{col.format(row.summary)}</Table.Td>
+                    ),
+                  )}
+                  <Table.Td>
+                    <Last5 value={row.summary.last5} />
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      )}
+    </Stack>
+  )
+}
+
 export function Home() {
   const { user } = useAuth()
   // undefined = user hasn't touched the selector yet, so it defaults to the
@@ -141,6 +224,7 @@ export function Home() {
   const [xAxis, setXAxis] = useState<'date' | 'games_played'>('date')
   const [allTimeSortBy, setAllTimeSortBy] = useState('win_pct')
   const [leaderboardSortBy, setLeaderboardSortBy] = useState('win_pct')
+  const [teamStandingsSortBy, setTeamStandingsSortBy] = useState('win_pct')
 
   const { data: seasons } = useQuery({ queryKey: ['seasons'], queryFn: seasonsApi.listSeasons })
   const { data: teams } = useQuery({ queryKey: ['teams'], queryFn: teamsApi.listTeams })
@@ -173,6 +257,18 @@ export function Home() {
     queryFn: () => statsApi.getAllPlayerSummaries(),
   })
 
+  // Team filter doesn't apply here — filtering "teams" down to one specific
+  // team would leave a single-row table, so this only respects season/place/side.
+  const { data: teamStandings } = useQuery({
+    queryKey: ['teams-summary', seasonIdNum, placeIdNum, sideFilter],
+    queryFn: () =>
+      statsApi.getAllTeamSummaries({
+        seasonId: seasonIdNum,
+        placeId: placeIdNum,
+        side: sideFilter,
+      }),
+  })
+
   const { data: trend } = useQuery({
     queryKey: ['trend', metric, xAxis, seasonIdNum, teamIdNum, placeIdNum, sideFilter],
     queryFn: () =>
@@ -195,7 +291,10 @@ export function Home() {
   ]
   const teamOptions = [
     { value: '', label: 'All teams' },
-    ...(teams ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+    ...(teams ?? []).map((t) => ({
+      value: String(t.id),
+      label: `${t.name} (${t.abbreviation})`,
+    })),
   ]
   const placeOptions = [
     { value: '', label: 'All places' },
@@ -298,6 +397,18 @@ export function Home() {
           </SimpleGrid>
         </Group>
         <TrendChart trend={trend} />
+      </Paper>
+
+      <Paper withBorder p="md">
+        <Title order={4} mb="sm">
+          By team
+        </Title>
+        <TeamStandingsTable
+          rows={teamStandings ?? []}
+          sortBy={teamStandingsSortBy}
+          onSortChange={setTeamStandingsSortBy}
+          minWidth={1400}
+        />
       </Paper>
 
       <Paper withBorder p="md">

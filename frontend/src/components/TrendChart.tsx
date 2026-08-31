@@ -3,6 +3,7 @@ import { LineChart } from '@mantine/charts'
 import { Group, Stack, Text, UnstyledButton } from '@mantine/core'
 
 import type { TrendResponse } from '../api/types'
+import { formatDateDisplay } from '../lib/date'
 
 const COLORS = ['blue.6', 'red.6', 'green.6', 'yellow.6', 'grape.6', 'cyan.6', 'orange.6']
 
@@ -38,7 +39,9 @@ export function TrendChart({ trend }: { trend: TrendResponse | undefined }) {
   })
 
   const data = xValues.map((x) => {
-    const row: Record<string, string | number | null> = { x }
+    const row: Record<string, string | number | null> = {
+      x: trend.x_axis === 'date' ? formatDateDisplay(x) : x,
+    }
     trend.series.forEach((s, i) => {
       const point = seriesPoints[i].find((p) => p.x === x)
       row[s.player.name] = point ? point.value : null

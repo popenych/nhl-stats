@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import * as gamesApi from '../api/games'
 import type { GameFilters } from '../api/games'
+import { formatDateDisplay } from '../lib/date'
 import { myOutcome, teamOutcome } from '../lib/gameOutcome'
 import { GameResultCell } from './GameResultCell'
 
@@ -64,7 +65,7 @@ export function GamesMiniTable({
                   <Table.Td>
                     <GameResultCell game={g} outcome={outcome} />
                   </Table.Td>
-                  <Table.Td ta="right">{g.date}</Table.Td>
+                  <Table.Td ta="right">{formatDateDisplay(g.date)}</Table.Td>
                 </Table.Tr>
               )
             })}

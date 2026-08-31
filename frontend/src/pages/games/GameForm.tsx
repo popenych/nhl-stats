@@ -295,6 +295,7 @@ export function GameForm({
               <DateInput
                 label="Date"
                 required
+                valueFormat="DD.MM.YYYY"
                 leftSection={<IconCalendar size={16} />}
                 {...form.getInputProps('date')}
               />

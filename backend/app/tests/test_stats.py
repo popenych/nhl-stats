@@ -201,6 +201,24 @@ async def test_player_team_breakdown(db: AsyncSession, scenario: dict) -> None:
     assert by_abbr["NSH"].ties == 1
 
 
+async def test_player_team_breakdown_scoped_to_opponent(db: AsyncSession, scenario: dict) -> None:
+    # All 3 of alex's games in `scenario` are against friend, so scoping to
+    # that opponent should match the unscoped breakdown exactly.
+    rows = await stats_service.player_team_breakdown(
+        db, scenario["alex_id"], opponent_id=scenario["friend_id"]
+    )
+    by_abbr = {r.team.abbreviation: r.summary for r in rows}
+    assert set(by_abbr) == {"OTT", "NSH"}
+    assert by_abbr["OTT"].games_played == 2
+    assert by_abbr["NSH"].games_played == 1
+
+    # A player alex has never played is scoped to zero shared games.
+    empty_rows = await stats_service.player_team_breakdown(
+        db, scenario["alex_id"], opponent_id=999999
+    )
+    assert empty_rows == []
+
+
 async def test_head_to_head_filters_by_team_and_side(db: AsyncSession, scenario: dict) -> None:
     h2h = await stats_service.head_to_head(
         db,
@@ -490,6 +508,19 @@ async def test_trend_by_date_collapses_same_day_games_to_last_value(
         db, "win_pct", "games_played", player_id=scenario["alex_id"]
     )
     assert [p.x for p in by_games.series[0].points] == ["1", "2", "3", "4", "5"]
+
+
+async def test_all_team_summaries_aggregates_across_players(
+    db: AsyncSession, scenario: dict
+) -> None:
+    """team_a (OTT): g1 alex home W, g2 friend home T, g3 alex home L —
+    3 GP, 1-1-1 across whichever player wore it each time."""
+    rows = await stats_service.all_team_summaries(db)
+
+    by_abbr = {r.team.abbreviation: r.summary for r in rows}
+    assert by_abbr["OTT"].games_played == 3
+    assert (by_abbr["OTT"].wins, by_abbr["OTT"].losses, by_abbr["OTT"].ties) == (1, 1, 1)
+    assert by_abbr["NSH"].games_played == 3
 
 
 async def test_place_summary_totals_games(db: AsyncSession, scenario: dict) -> None:

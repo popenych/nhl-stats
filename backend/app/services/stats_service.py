@@ -367,11 +367,15 @@ async def player_team_breakdown(
     season_id: int | None = None,
     place_id: int | None = None,
     side: SideFilter | None = None,
+    opponent_id: int | None = None,
 ) -> list[PlayerTeamSummaryRow]:
     """Every team this player has worn, each with its own full StatsSummary —
     backs a per-player table shaped like the Home leaderboard, but with rows
-    keyed by team instead of by player."""
+    keyed by team instead of by player. opponent_id narrows to just the
+    shared games against that specific opponent, same as head_to_head()."""
     games = await list_all_games(db, player_id=player_id, season_id=season_id, place_id=place_id)
+    if opponent_id is not None:
+        games = [g for g in games if any(s.player_id == opponent_id for s in g.sides)]
     results = _filter_by_side(_split_by_player(games, player_id), side)
     by_team, teams = _group_by_team(results)
 
@@ -612,6 +616,51 @@ async def all_player_summaries(
     rows = [
         PlayerSummaryRow(player=PlayerOut.model_validate(players[pid]), summary=summarize(results))
         for pid, results in by_player.items()
+    ]
+    rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
+    return rows
+
+
+async def _group_all_teams(
+    db: AsyncSession,
+    *,
+    season_id: int | None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> tuple[dict[int, list[_Result]], dict[int, Team]]:
+    games = await list_all_games(db, season_id=season_id, place_id=place_id)
+
+    by_team: dict[int, list[_Result]] = {}
+    teams: dict[int, Team] = {}
+    for game in games:
+        for game_side in game.sides:
+            if side is not None and game_side.side != side:
+                continue
+            opp = next(s for s in game.sides if s is not game_side)
+            by_team.setdefault(game_side.team_id, []).append(
+                _Result(date=game.date, own=game_side, opp=opp, game_id=game.id)
+            )
+            teams[game_side.team_id] = game_side.team
+
+    return by_team, teams
+
+
+async def all_team_summaries(
+    db: AsyncSession,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> list[PlayerTeamSummaryRow]:
+    """Every team's full StatsSummary across all players who've worn it —
+    backs the Home page's team-by-team table, same shape as
+    player_team_breakdown's rows (also {team, summary}) just aggregated the
+    other way (across players, not across teams for one player)."""
+    by_team, teams = await _group_all_teams(db, season_id=season_id, place_id=place_id, side=side)
+
+    rows = [
+        PlayerTeamSummaryRow(team=TeamOut.model_validate(teams[tid]), summary=summarize(results))
+        for tid, results in by_team.items()
     ]
     rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
     return rows

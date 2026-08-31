@@ -13,3 +13,10 @@ export function toDateOnlyString(value: Date | string): string {
   const day = String(value.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// Display-only: "YYYY-MM-DD" (as stored/returned by the API) -> "DD.MM.YYYY"
+// (the app's chosen display format everywhere a date is shown as text).
+export function formatDateDisplay(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-')
+  return `${day}.${month}.${year}`
+}

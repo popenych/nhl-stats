@@ -73,9 +73,15 @@ async def get_player_team_breakdown(
     season_id: int | None = None,
     place_id: int | None = None,
     side: SideFilter | None = None,
+    opponent_id: int | None = None,
 ) -> object:
     return await stats_service.player_team_breakdown(
-        db, player_id, season_id=season_id, place_id=place_id, side=side
+        db,
+        player_id,
+        season_id=season_id,
+        place_id=place_id,
+        side=side,
+        opponent_id=opponent_id,
     )
 
 
@@ -156,6 +162,19 @@ async def get_all_player_summaries(
 ) -> object:
     return await stats_service.all_player_summaries(
         db, season_id=season_id, team_id=team_id, place_id=place_id, side=side
+    )
+
+
+@router.get("/teams-summary", response_model=list[PlayerTeamSummaryRow])
+async def get_all_team_summaries(
+    db: DbSession,
+    _user: CurrentUser,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> object:
+    return await stats_service.all_team_summaries(
+        db, season_id=season_id, place_id=place_id, side=side
     )
 
 

@@ -19,13 +19,7 @@ import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as statsApi from '../../api/stats'
 import * as teamsApi from '../../api/teams'
-import type {
-  MetricKey,
-  PlayerExtras,
-  PlayerTeamSummaryRow,
-  SideFilter,
-  TeamRecord,
-} from '../../api/types'
+import type { PlayerExtras, PlayerTeamSummaryRow, SideFilter, TeamRecord } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 import { GameRecordCell } from '../../components/GameRecordCell'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
@@ -34,12 +28,10 @@ import { StatHeader } from '../../components/StatHeader'
 import type { CompareColumn, ExtraRow } from '../../components/StatsCompareTable'
 import { StatsCompareTable } from '../../components/StatsCompareTable'
 import { TeamLogo } from '../../components/TeamLogo'
-import { TrendChart } from '../../components/TrendChart'
 import { formatRecord } from '../../lib/record'
 import {
   COMPARE_TABLE_ROWS,
   LEADERBOARD_COLUMNS,
-  METRIC_OPTIONS,
   SIDE_OPTIONS,
   SORT_FIELDS,
   sortByField,
@@ -224,7 +216,6 @@ export function PlayerPage() {
   const [teamIdOpponent, setTeamIdOpponent] = useState<string | null>(null)
   const [placeId, setPlaceId] = useState<string | null>(null)
   const [side, setSide] = useState<SideFilter | ''>('')
-  const [metric, setMetric] = useState<MetricKey>('win_pct')
   const [byTeamSortBy, setByTeamSortBy] = useState('win_pct')
 
   const seasonIdNum = seasonId ? Number(seasonId) : undefined
@@ -259,14 +250,12 @@ export function PlayerPage() {
     queryFn: () => statsApi.getPlayerExtras(playerId, commonFilters),
   })
 
-  const { data: byTeam } = useQuery({
-    queryKey: ['player-by-team', playerId, commonFilters],
-    queryFn: () => statsApi.getPlayerTeamBreakdown(playerId, commonFilters),
-  })
+  const opponentIdNum = opponentId ? Number(opponentId) : undefined
 
-  const { data: trend } = useQuery({
-    queryKey: ['trend', metric, playerId, teamIdMeNum, commonFilters],
-    queryFn: () => statsApi.getTrend({ metric, x: 'date', teamId: teamIdMeNum, ...commonFilters }),
+  const { data: byTeam } = useQuery({
+    queryKey: ['player-by-team', playerId, commonFilters, opponentIdNum],
+    queryFn: () =>
+      statsApi.getPlayerTeamBreakdown(playerId, { ...commonFilters, opponentId: opponentIdNum }),
   })
 
   const { data: h2h } = useQuery({
@@ -310,7 +299,10 @@ export function PlayerPage() {
   ]
   const teamOptions = [
     { value: '', label: 'All teams' },
-    ...(teams ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+    ...(teams ?? []).map((t) => ({
+      value: String(t.id),
+      label: `${t.name} (${t.abbreviation})`,
+    })),
   ]
   const placeOptions = [
     { value: '', label: 'All places' },
@@ -454,22 +446,8 @@ export function PlayerPage() {
       </Paper>
 
       <Paper withBorder p="md">
-        <Group justify="space-between" mb="sm">
-          <Title order={4}>Trend</Title>
-          <Select
-            data={METRIC_OPTIONS}
-            value={metric}
-            onChange={(v) => v && setMetric(v as MetricKey)}
-            w={200}
-            searchable
-          />
-        </Group>
-        <TrendChart trend={trend} />
-      </Paper>
-
-      <Paper withBorder p="md">
         <Title order={4} mb="sm">
-          Stats by team
+          {opponentId ? `Stats by team vs ${opponentName ?? ''}` : 'Stats by team'}
         </Title>
         <TeamBreakdownTable
           rows={byTeam ?? []}
@@ -496,7 +474,7 @@ export function PlayerPage() {
             page_size: opponentId ? 100 : undefined,
           }}
           highlightPlayerId={playerId}
-          opponentId={opponentId ? Number(opponentId) : undefined}
+          opponentId={opponentIdNum}
         />
       </Paper>
     </Stack>

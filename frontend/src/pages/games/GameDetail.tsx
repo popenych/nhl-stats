@@ -21,6 +21,7 @@ import * as gamesApi from '../../api/games'
 import type { Team } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 import { TeamLogo } from '../../components/TeamLogo'
+import { formatDateDisplay } from '../../lib/date'
 import { formatMMSS } from '../../lib/time'
 
 const STAT_ROWS: {
@@ -137,7 +138,7 @@ export function GameDetail() {
     <>
       <Group justify="space-between" mb="md">
         <Title order={2}>
-          {game.away.player.name} vs {game.home.player.name} — {game.date}
+          {game.away.player.name} vs {game.home.player.name} — {formatDateDisplay(game.date)}
         </Title>
         {canEdit && (
           <Group>

@@ -15,6 +15,7 @@ import type { GameListItem } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 import { GameResultCell } from '../../components/GameResultCell'
 import { TeamLogo } from '../../components/TeamLogo'
+import { formatDateDisplay } from '../../lib/date'
 
 function canDelete(userId: number | undefined, isAdmin: boolean, game: GameListItem) {
   if (isAdmin) return true
@@ -103,7 +104,10 @@ export function GamesList() {
           placeholder="Team"
           clearable
           searchable
-          data={(teams ?? []).map((t) => ({ value: String(t.id), label: t.abbreviation }))}
+          data={(teams ?? []).map((t) => ({
+            value: String(t.id),
+            label: `${t.name} (${t.abbreviation})`,
+          }))}
           value={teamId}
           onChange={resetPage(setTeamId)}
           leftSection={selectedTeam ? <TeamLogo team={selectedTeam} size={18} /> : undefined}
@@ -149,7 +153,7 @@ export function GamesList() {
                   onClick={() => navigate(`/games/${g.id}`)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <Table.Td>{g.date}</Table.Td>
+                  <Table.Td>{formatDateDisplay(g.date)}</Table.Td>
                   <Table.Td>
                     <GameResultCell game={g} />
                   </Table.Td>

@@ -87,7 +87,7 @@ export function GameStatsGrid({
   }))
   const teamOptions = teams.map((t) => ({
     value: String(t.id),
-    label: `${t.abbreviation} — ${t.name}`,
+    label: `${t.name} (${t.abbreviation})`,
   }))
 
   const awayConf = (key: string) => confidence?.away?.[key]

@@ -59,11 +59,16 @@ export function getPlayerTeamExtras(
 
 export function getPlayerTeamBreakdown(
   playerId: number,
-  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+  options: {
+    seasonId?: number
+    placeId?: number
+    side?: SideFilter
+    opponentId?: number
+  } = {},
 ) {
-  const { seasonId, placeId, side } = options
+  const { seasonId, placeId, side, opponentId } = options
   return api.get<PlayerTeamSummaryRow[]>(
-    `/stats/players/${playerId}/by-team${qs({ season_id: seasonId, place_id: placeId, side })}`,
+    `/stats/players/${playerId}/by-team${qs({ season_id: seasonId, place_id: placeId, side, opponent_id: opponentId })}`,
   )
 }
 
@@ -120,6 +125,15 @@ export function getAllPlayerSummaries(options: StatsFilters = {}) {
   const { seasonId, teamId, placeId, side } = options
   return api.get<PlayerSummaryRow[]>(
     `/stats/players-summary${qs({ season_id: seasonId, team_id: teamId, place_id: placeId, side })}`,
+  )
+}
+
+export function getAllTeamSummaries(
+  options: { seasonId?: number; placeId?: number; side?: SideFilter } = {},
+) {
+  const { seasonId, placeId, side } = options
+  return api.get<PlayerTeamSummaryRow[]>(
+    `/stats/teams-summary${qs({ season_id: seasonId, place_id: placeId, side })}`,
   )
 }
 
