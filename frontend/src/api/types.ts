@@ -3,7 +3,6 @@ export type UserRole = 'admin' | 'member'
 export interface Player {
   id: number
   name: string
-  photo_path: string | null
   icon: string | null
 }
 
@@ -26,7 +25,6 @@ export interface Team {
 export interface Place {
   id: number
   name: string
-  photo_path: string | null
   icon: string | null
 }
 

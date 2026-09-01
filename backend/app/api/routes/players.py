@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -6,7 +6,6 @@ from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models.player import Player
 from app.models.user import UserRole
 from app.schemas.player import PlayerOut, PlayerUpdate
-from app.services.photo_service import save_photo
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -51,22 +50,6 @@ async def update_player(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Player name already in use"
         ) from exc
-    return player
-
-
-@router.post("/{player_id}/photo", response_model=PlayerOut)
-async def upload_player_photo(
-    player_id: int,
-    db: DbSession,
-    user: CurrentUser,
-    file: UploadFile = File(...),
-) -> object:
-    _ensure_self_or_admin(user, player_id)
-    player = await db.get(Player, player_id)
-    if player is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player not found")
-    player.photo_path = await save_photo(file, "players")
-    await db.commit()
     return player
 
 

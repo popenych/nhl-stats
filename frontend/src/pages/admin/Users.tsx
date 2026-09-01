@@ -7,15 +7,17 @@ import {
   Select,
   Stack,
   Table,
+  Text,
   TextInput,
   Title,
   PasswordInput,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { IconUserPlus } from '@tabler/icons-react'
+import { IconDatabaseExport, IconUserPlus } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import * as backupApi from '../../api/backup'
 import * as usersApi from '../../api/users'
 import { ApiError } from '../../lib/apiClient'
 import type { UserRole } from '../../api/types'
@@ -27,6 +29,16 @@ export function AdminUsers() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.listUsers,
+  })
+
+  const backupMutation = useMutation({
+    mutationFn: backupApi.triggerBackup,
+    onSuccess: () =>
+      notifications.show({
+        message: 'Backup requested — it runs within about 30 seconds',
+        color: 'green',
+      }),
+    onError: () => notifications.show({ message: 'Failed to request backup', color: 'red' }),
   })
 
   const form = useForm({
@@ -102,6 +114,26 @@ export function AdminUsers() {
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
+      </Paper>
+
+      <Paper withBorder p="md" mt="md">
+        <Group justify="space-between">
+          <div>
+            <Title order={4}>Backups</Title>
+            <Text size="sm" c="dimmed">
+              Runs daily automatically. Trigger one manually if you want an up-to-date snapshot
+              right now (e.g. before a risky change).
+            </Text>
+          </div>
+          <Button
+            variant="light"
+            leftSection={<IconDatabaseExport size={16} />}
+            onClick={() => backupMutation.mutate()}
+            loading={backupMutation.isPending}
+          >
+            Run backup now
+          </Button>
+        </Group>
       </Paper>
 
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Add a friend">

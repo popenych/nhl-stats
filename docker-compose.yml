@@ -12,6 +12,11 @@ services:
       # caches them under the container user's home dir — without this volume
       # they'd re-download on every container recreation.
       - paddle-models:/root/.paddlex
+      # Shared with `backup` (see infra/backup/run.sh) — this is how the
+      # "run backup now" button reaches the backup container, which has no
+      # other channel to the backend (no shared network trigger, no Docker
+      # socket access).
+      - backup-trigger:/data/backup-trigger
     expose:
       - "8000"
 
@@ -29,6 +34,7 @@ services:
       - db-data:/data/db:ro
       - photo-data:/data/photos:ro
       - backup-data:/data/backups
+      - backup-trigger:/data/backup-trigger
       - ./infra/rclone/rclone.conf:/root/.config/rclone/rclone.conf:ro
 
   caddy:
@@ -52,4 +58,5 @@ volumes:
   photo-data:
   paddle-models:
   backup-data:
+  backup-trigger:
   caddy-data:

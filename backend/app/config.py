@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 30
     photo_storage_dir: str = "./data/photos"
+    # A file the backend touches and the backup sidecar polls for (see
+    # infra/backup/run.sh) — the two containers share nothing else, so this
+    # is how "run a backup now" gets from the API to that container without
+    # giving the backend a Docker socket or duplicating rclone/backup logic
+    # into it.
+    backup_trigger_path: str = "./data/backup-trigger/run"
     cors_origins: str = "http://localhost:5173"
     # False for local dev (plain http); set true in prod .env once served over
     # https behind Caddy, so auth cookies get the Secure flag.

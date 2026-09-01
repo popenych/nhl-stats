@@ -16,5 +16,4 @@ class PlayerOut(BaseModel):
 
     id: int
     name: str
-    photo_path: str | None
     icon: str | None

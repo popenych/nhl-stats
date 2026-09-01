@@ -62,8 +62,11 @@ e.g. a VPN — already bound to 443 on the host). Check what's holding a port wi
 
 ## 5. Backups (optional but recommended)
 
-The `backup` sidecar pushes a daily SQLite snapshot + the photos directory to Yandex Disk via
-`rclone`.
+The `backup` sidecar pushes a SQLite snapshot + the photos directory to Yandex Disk via `rclone`,
+once immediately when the container starts and then every 24h from that moment (not a fixed
+wall-clock time — a restart resets the clock). An admin can also trigger one on demand from
+**Manage users → Run backup now** in the app; the backend touches a shared trigger file the
+backup container polls every ~30s (see `infra/backup/run.sh`).
 
 ```bash
 cp infra/rclone/rclone.conf.example infra/rclone/rclone.conf
