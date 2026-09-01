@@ -15,10 +15,21 @@ MAX_PLAUSIBLE_INT = 99
 
 
 def parse_int(text: str) -> int | None:
-    match = _INT_RE.search(text)
-    if not match:
+    matches = _INT_RE.findall(text)
+    if not matches:
         return None
-    value = int(match.group(1))
+    # More than one separate digit run means either two rows' values got
+    # merged into a single detection box with a separator between them
+    # (e.g. "23 12" — the real hits value sitting right next to shots), or a
+    # differently-formatted value (mm:ss, a percentage) got anchored to this
+    # field entirely (e.g. "04:00" or "72.7%" landing on FACEOFFS WON).
+    # Blindly taking the first digit run silently returns the wrong number
+    # in both cases — every one of these was a real production mismatch
+    # (confirmed against user-corrected historical data) — so treat it the
+    # same as an unparseable reading rather than guessing.
+    if len(matches) > 1:
+        return None
+    value = int(matches[0])
     if value > MAX_PLAUSIBLE_INT:
         return None
     return value
@@ -38,6 +49,16 @@ def parse_mmss(text: str) -> int | None:
 def parse_pct(text: str) -> float | None:
     match = _PCT_RE.search(text)
     if not match:
+        return None
+    # A legitimate percentage's own match already spans every digit in a
+    # clean reading (e.g. "81.9%" is consumed whole). Digits left over
+    # outside the match — e.g. "07:39" matches "07" but leaves ":39" — mean
+    # a differently-formatted value (mm:ss, most often) bled into this
+    # field; same reasoning as parse_int's multi-digit-group rejection,
+    # just detected differently since a pct match can itself span more than
+    # one digit run (integer + decimal parts).
+    remainder = text[: match.start()] + text[match.end() :]
+    if re.search(r"\d", remainder):
         return None
     value = float(match.group(1))
     if not (0 <= value <= 100):
