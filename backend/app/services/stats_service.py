@@ -100,7 +100,10 @@ def _current_streak(results: list[_Result]) -> str:
 
 
 def _last5(results: list[_Result]) -> str:
-    return "".join(_outcome(r) for r in reversed(results[-5:]))
+    """Chronological, oldest to newest — so the most recent game reads as
+    the rightmost letter, matching how the frontend displays it left to
+    right."""
+    return "".join(_outcome(r) for r in results[-5:])
 
 
 def _streaks(results: list[_Result]) -> tuple[int, int]:
@@ -182,6 +185,7 @@ def summarize(results: list[_Result]) -> StatsSummary:
             faceoff_pct=0.0,
             powerplay_goals=0,
             powerplay_total=0,
+            powerplay_minutes_total_seconds=0.0,
             powerplay_minutes_avg_seconds=0.0,
             pp_pct=0.0,
             penalty_minutes_total_seconds=0.0,
@@ -241,6 +245,7 @@ def summarize(results: list[_Result]) -> StatsSummary:
         faceoff_pct=(faceoffs_own / faceoffs_total) if faceoffs_total else 0.0,
         powerplay_goals=pp_goals,
         powerplay_total=pp_total,
+        powerplay_minutes_total_seconds=pp_minutes_total,
         powerplay_minutes_avg_seconds=pp_minutes_total / gp,
         pp_pct=(pp_goals / pp_total) if pp_total else 0.0,
         penalty_minutes_total_seconds=penalty_minutes_total,
@@ -402,16 +407,11 @@ async def team_summary(
     return summarize(results)
 
 
-async def team_extras(
-    db: AsyncSession,
-    team_id: int,
-    *,
-    season_id: int | None = None,
-    place_id: int | None = None,
-    side: SideFilter | None = None,
-) -> TeamExtras:
-    games = await list_all_games(db, team_id=team_id, season_id=season_id, place_id=place_id)
-    results = _filter_by_side(_split_by_team(games, team_id), side)
+def _build_team_extras(results: list[_Result]) -> TeamExtras:
+    """Streaks, most-played/wins/losses-with-a-player, and best/worst games —
+    from an arbitrary list of a team's own results. Mirrors
+    _build_player_extras; reused for both a team's overall extras and the
+    Home page's per-team row in all_team_summaries."""
     best_win_streak, worst_lose_streak = _streaks(results)
     best_diff, worst_diff, best_gf, worst_ga = _game_records(results)
 
@@ -448,6 +448,19 @@ async def team_extras(
         best_gf_game=best_gf,
         worst_ga_game=worst_ga,
     )
+
+
+async def team_extras(
+    db: AsyncSession,
+    team_id: int,
+    *,
+    season_id: int | None = None,
+    place_id: int | None = None,
+    side: SideFilter | None = None,
+) -> TeamExtras:
+    games = await list_all_games(db, team_id=team_id, season_id=season_id, place_id=place_id)
+    results = _filter_by_side(_split_by_team(games, team_id), side)
+    return _build_team_extras(results)
 
 
 async def place_summary(
@@ -614,7 +627,11 @@ async def all_player_summaries(
     )
 
     rows = [
-        PlayerSummaryRow(player=PlayerOut.model_validate(players[pid]), summary=summarize(results))
+        PlayerSummaryRow(
+            player=PlayerOut.model_validate(players[pid]),
+            summary=summarize(results),
+            extras=_build_player_extras(results),
+        )
         for pid, results in by_player.items()
     ]
     rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
@@ -630,8 +647,12 @@ async def _group_all_teams(
 ) -> tuple[dict[int, list[_Result]], dict[int, Team]]:
     games = await list_all_games(db, season_id=season_id, place_id=place_id)
 
+    # Seeded with every team up front (not just ones with a game.side in this
+    # filtered set) — see all_team_summaries: a team nobody's played yet
+    # still needs to show up as a 0-GP row, not silently disappear.
+    all_teams = (await db.execute(select(Team))).scalars().all()
     by_team: dict[int, list[_Result]] = {}
-    teams: dict[int, Team] = {}
+    teams: dict[int, Team] = {t.id: t for t in all_teams}
     for game in games:
         for game_side in game.sides:
             if side is not None and game_side.side != side:
@@ -640,7 +661,6 @@ async def _group_all_teams(
             by_team.setdefault(game_side.team_id, []).append(
                 _Result(date=game.date, own=game_side, opp=opp, game_id=game.id)
             )
-            teams[game_side.team_id] = game_side.team
 
     return by_team, teams
 
@@ -659,10 +679,17 @@ async def all_team_summaries(
     by_team, teams = await _group_all_teams(db, season_id=season_id, place_id=place_id, side=side)
 
     rows = [
-        PlayerTeamSummaryRow(team=TeamOut.model_validate(teams[tid]), summary=summarize(results))
-        for tid, results in by_team.items()
+        PlayerTeamSummaryRow(
+            team=TeamOut.model_validate(team),
+            summary=summarize(by_team.get(tid, [])),
+            extras=_build_team_extras(by_team.get(tid, [])),
+        )
+        for tid, team in teams.items()
     ]
-    rows.sort(key=lambda r: r.summary.win_pct, reverse=True)
+    # Teams with at least one game sort by win% as before; teams nobody's
+    # played yet (win_pct defaults to 0.0, same as a real 0% record) are
+    # pushed to the bottom instead of mixing in among real 0%-win teams.
+    rows.sort(key=lambda r: (r.summary.games_played > 0, r.summary.win_pct), reverse=True)
     return rows
 
 

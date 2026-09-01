@@ -19,7 +19,7 @@ import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as statsApi from '../../api/stats'
 import * as teamsApi from '../../api/teams'
-import type { PlayerExtras, PlayerTeamSummaryRow, SideFilter, TeamRecord } from '../../api/types'
+import type { PlayerExtras, PlayerTeamSummaryRow, SideFilter } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 import { GameRecordCell } from '../../components/GameRecordCell'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
@@ -28,6 +28,7 @@ import { StatHeader } from '../../components/StatHeader'
 import type { CompareColumn, ExtraRow } from '../../components/StatsCompareTable'
 import { StatsCompareTable } from '../../components/StatsCompareTable'
 import { TeamLogo } from '../../components/TeamLogo'
+import { TeamRecordValue } from '../../components/TeamRecordCell'
 import { formatRecord } from '../../lib/record'
 import {
   COMPARE_TABLE_ROWS,
@@ -37,28 +38,6 @@ import {
   sortByField,
 } from '../../lib/stats'
 import { STICKY_FIRST_COL } from '../../lib/tableStyles'
-
-function TeamRecordValue({ record }: { record: TeamRecord | null }) {
-  if (!record) return <Text c="dimmed">—</Text>
-  return (
-    <Group gap={6} justify="flex-end" wrap="nowrap">
-      <Text size="sm" c="dimmed">
-        {record.games_played} GP,{' '}
-        {formatRecord(
-          record.wins,
-          record.losses,
-          record.games_played - record.wins - record.losses,
-        )}
-      </Text>
-      <Text component={Link} to={`/teams/${record.team.id}`} fw={700} size="sm">
-        {record.team.abbreviation}
-      </Text>
-      <Link to={`/teams/${record.team.id}`}>
-        <TeamLogo team={record.team} size={20} />
-      </Link>
-    </Group>
-  )
-}
 
 // Records section for the player compare table (own overall / vs opponent /
 // opponent) — every row keyed off PlayerExtras, since all three columns
@@ -465,6 +444,7 @@ export function PlayerPage() {
             player_id: playerId,
             season_id: seasonIdNum,
             team_id: teamIdMeNum,
+            opponent_team_id: teamIdOpponentNum,
             place_id: placeIdNum,
             side: sideFilter,
             // opponentId narrows client-side (see GamesMiniTable) rather than

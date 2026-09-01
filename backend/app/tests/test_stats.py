@@ -152,7 +152,7 @@ async def test_player_summary_computes_record_and_rates(db: AsyncSession, scenar
     assert summary.pp_pct == pytest.approx(1 / 3)
     assert summary.pk_pct == pytest.approx(0.5)
     assert summary.current_streak == "L1"
-    assert summary.last5 == "LTW"
+    assert summary.last5 == "WTL"
     assert summary.shots_for == 21
     assert summary.faceoffs_won == 11
     assert summary.time_on_attack_avg_seconds == pytest.approx(300.0)
@@ -163,6 +163,7 @@ async def test_player_summary_computes_record_and_rates(db: AsyncSession, scenar
     assert summary.goal_diff_per_game == pytest.approx((6 - 7) / 3)
     assert summary.penalty_minutes_total_seconds == pytest.approx(0.0)
     assert summary.penalty_minutes_avg_seconds == pytest.approx(0.0)
+    assert summary.powerplay_minutes_total_seconds == pytest.approx(0.0)
     assert summary.penalty_kill_situations == 6
     assert summary.penalty_kills_successful == 3
 
@@ -392,6 +393,16 @@ async def test_all_player_summaries_returns_every_player_with_full_stats(
         (r.summary.win_pct for r in rows), reverse=True
     )
 
+    # Each row also carries the same "extras" (streaks/records) shown on the
+    # player's own page — alex: W(g1), T(g2), L(g3), so best win/lose streaks
+    # are both 1, and team_a (worn in g1+g3) is their most-played team.
+    by_extras = {r.player.id: r.extras for r in rows}
+    alex_extras = by_extras[scenario["alex_id"]]
+    assert alex_extras.best_win_streak == 1
+    assert alex_extras.worst_lose_streak == 1
+    assert alex_extras.most_played_team is not None
+    assert alex_extras.most_played_team.games_played == 2
+
 
 async def test_all_player_summaries_empty_under_filter_does_not_list_everyone(
     db: AsyncSession, scenario: dict
@@ -521,6 +532,30 @@ async def test_all_team_summaries_aggregates_across_players(
     assert by_abbr["OTT"].games_played == 3
     assert (by_abbr["OTT"].wins, by_abbr["OTT"].losses, by_abbr["OTT"].ties) == (1, 1, 1)
     assert by_abbr["NSH"].games_played == 3
+
+    # OTT was worn by alex in g1+g3 and friend in g2 — alex is most-played.
+    ott_extras = {r.team.abbreviation: r.extras for r in rows}["OTT"]
+    assert ott_extras is not None
+    assert ott_extras.most_played_player is not None
+    assert ott_extras.most_played_player.player.id == scenario["alex_id"]
+    assert ott_extras.most_played_player.games_played == 2
+
+
+async def test_all_team_summaries_includes_never_played_teams(
+    db: AsyncSession, scenario: dict
+) -> None:
+    """A team nobody's used in a game yet still shows up (0 GP), sorted
+    after every team that's actually been played."""
+    unplayed = Team(abbreviation="SEA", name="Seattle Kraken")
+    db.add(unplayed)
+    await db.commit()
+
+    rows = await stats_service.all_team_summaries(db)
+
+    by_abbr = {r.team.abbreviation: r.summary for r in rows}
+    assert by_abbr["SEA"].games_played == 0
+    assert by_abbr["SEA"].wins == 0
+    assert rows[-1].team.abbreviation == "SEA"
 
 
 async def test_place_summary_totals_games(db: AsyncSession, scenario: dict) -> None:

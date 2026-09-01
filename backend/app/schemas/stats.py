@@ -32,6 +32,7 @@ MetricKey = Literal[
     "faceoff_pct",
     "powerplay_goals",
     "powerplay_total",
+    "powerplay_minutes_total_seconds",
     "powerplay_minutes_avg_seconds",
     "pp_pct",
     "penalty_minutes_total_seconds",
@@ -69,6 +70,7 @@ METRIC_LABELS: dict[MetricKey, str] = {
     "faceoff_pct": "FOW%",
     "powerplay_goals": "PPG",
     "powerplay_total": "PP total",
+    "powerplay_minutes_total_seconds": "PP min total",
     "powerplay_minutes_avg_seconds": "PP min avg",
     "pp_pct": "PP%",
     "penalty_minutes_total_seconds": "PK min total",
@@ -104,6 +106,7 @@ class StatsSummary(BaseModel):
     faceoff_pct: float
     powerplay_goals: int
     powerplay_total: int
+    powerplay_minutes_total_seconds: float
     powerplay_minutes_avg_seconds: float
     pp_pct: float
     penalty_minutes_total_seconds: float
@@ -214,11 +217,18 @@ class LeaderboardResponse(BaseModel):
 class PlayerSummaryRow(BaseModel):
     player: PlayerOut
     summary: StatsSummary
+    extras: PlayerExtras
 
 
 class PlayerTeamSummaryRow(BaseModel):
     team: TeamOut
     summary: StatsSummary
+    # Only populated by all_team_summaries (the Home page's "by team" table,
+    # aggregated across every player who's worn each team) — left unset by
+    # player_team_breakdown, whose rows are already scoped to one player, so
+    # "most-played/wins/losses player" would be a degenerate always-self
+    # answer there.
+    extras: TeamExtras | None = None
 
 
 class TrendPoint(BaseModel):

@@ -86,6 +86,11 @@ class GameOut(BaseModel):
     created_by_user_id: int
     home: GameSideOut
     away: GameSideOut
+    # Not an ORM attribute — always computed per-request from the current
+    # user via game_service.can_edit_game and patched onto the validated
+    # model in the route (see api/routes/games.py). The default here only
+    # matters until that patch happens.
+    can_edit: bool = False
 
 
 class GameListItem(BaseModel):
@@ -97,6 +102,7 @@ class GameListItem(BaseModel):
     place: PlaceOut
     home: GameSideOut
     away: GameSideOut
+    can_edit: bool = False
 
 
 class GameListResponse(BaseModel):

@@ -12,6 +12,7 @@ import type {
 export interface GameFilters {
   player_id?: number
   team_id?: number
+  opponent_team_id?: number
   season_id?: number
   place_id?: number
   date_from?: string

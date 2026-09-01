@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Button, FileButton, Group, Paper, Select, Stack, Text, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import {
@@ -20,36 +20,16 @@ import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as statsApi from '../../api/stats'
 import * as teamsApi from '../../api/teams'
-import type { MetricKey, Player, PlayerRecord, SideFilter, TeamExtras } from '../../api/types'
+import type { MetricKey, Player, SideFilter, TeamExtras } from '../../api/types'
 import { useAuth } from '../../auth/auth-context-value'
 import { GameRecordCell } from '../../components/GameRecordCell'
 import { GamesMiniTable } from '../../components/GamesMiniTable'
+import { PlayerRecordValue } from '../../components/PlayerRecordCell'
 import type { CompareColumn, ExtraRow } from '../../components/StatsCompareTable'
 import { StatsCompareTable } from '../../components/StatsCompareTable'
 import { TeamLogo } from '../../components/TeamLogo'
 import { TrendChart } from '../../components/TrendChart'
-import { formatRecord } from '../../lib/record'
 import { COMPARE_TABLE_ROWS, METRIC_OPTIONS, SIDE_OPTIONS } from '../../lib/stats'
-
-function PlayerRecordValue({ record }: { record: PlayerRecord | null }) {
-  if (!record) return <Text c="dimmed">—</Text>
-  return (
-    <Group gap={6} justify="flex-end" wrap="nowrap">
-      <Text size="sm" c="dimmed">
-        {record.games_played} GP,{' '}
-        {formatRecord(
-          record.wins,
-          record.losses,
-          record.games_played - record.wins - record.losses,
-        )}
-      </Text>
-      <Text component={Link} to={`/players/${record.player.id}`} fw={700} size="sm">
-        {record.player.icon ? `${record.player.icon} ` : ''}
-        {record.player.name}
-      </Text>
-    </Group>
-  )
-}
 
 // Records section for the team compare table (team overall + up to 3 player
 // slots). All four columns share the TeamExtras shape — the per-player-slot

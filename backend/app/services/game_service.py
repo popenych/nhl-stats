@@ -1,8 +1,10 @@
+from datetime import UTC, datetime, timedelta
 from datetime import date as date_
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.game import Game
 from app.models.game_side import GameSide, Side
 from app.models.user import User, UserRole
@@ -27,7 +29,24 @@ async def get_game(db: AsyncSession, game_id: int) -> Game:
 
 
 def can_edit_game(user: User, game: Game) -> bool:
+    # The admin can always edit/delete anything, regardless of the
+    # configured policy below — matches every other admin capability.
     if user.role == UserRole.ADMIN:
+        return True
+
+    if settings.game_edit_window_days is not None:
+        # SQLite doesn't actually persist tzinfo even for a DateTime(timezone=True)
+        # column — created_at comes back naive, so cutoff has to be naive too
+        # (both UTC) or this comparison raises.
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            days=settings.game_edit_window_days
+        )
+        if game.created_at < cutoff:
+            return False
+
+    if settings.game_edit_permission == "admin":
+        return False
+    if settings.game_edit_permission == "everyone":
         return True
     return user.player_id in {side.player_id for side in game.sides}
 
@@ -146,6 +165,7 @@ def _filtered_games_query(
     *,
     player_id: int | None,
     team_id: int | None,
+    opponent_team_id: int | None = None,
     season_id: int | None,
     place_id: int | None,
     date_from: date_ | None,
@@ -157,16 +177,31 @@ def _filtered_games_query(
         subquery = select(GameSide.game_id).where(GameSide.player_id == player_id)
         # side means "this player's side" when a player is given — matching
         # how side filtering works everywhere else (stats_service's `_Result`
-        # "own" side) — not "team_id's side", even if team_id is also given.
+        # "own" side) — not "team_id's side".
+        if side is not None:
+            subquery = subquery.where(GameSide.side == side)
+        # team_id means "the team THIS player wore" when a player is given —
+        # same GameSide row, not "this team appeared somewhere in the game"
+        # (that looser match made the player-page "Team (me)" filter include
+        # games where only the opponent wore the selected team).
+        if team_id is not None:
+            subquery = subquery.where(GameSide.team_id == team_id)
+        query = query.where(Game.id.in_(subquery))
+    elif team_id is not None:
+        # No player given — team_id describes this team's own side instead.
+        subquery = select(GameSide.game_id).where(GameSide.team_id == team_id)
         if side is not None:
             subquery = subquery.where(GameSide.side == side)
         query = query.where(Game.id.in_(subquery))
-    if team_id is not None:
-        subquery = select(GameSide.game_id).where(GameSide.team_id == team_id)
-        # No player given — side describes this team's own side instead.
-        if side is not None and player_id is None:
-            subquery = subquery.where(GameSide.side == side)
-        query = query.where(Game.id.in_(subquery))
+    if opponent_team_id is not None:
+        # The *other* side's team — only meaningful paired with player_id;
+        # without one, "opponent" isn't well-defined, so it's just "this
+        # team appeared somewhere in the game" (mirrors the team_id-alone
+        # branch above).
+        opp_subquery = select(GameSide.game_id).where(GameSide.team_id == opponent_team_id)
+        if player_id is not None:
+            opp_subquery = opp_subquery.where(GameSide.player_id != player_id)
+        query = query.where(Game.id.in_(opp_subquery))
     if season_id is not None:
         query = query.where(Game.season_id == season_id)
     if place_id is not None:
@@ -183,6 +218,7 @@ async def list_games(
     *,
     player_id: int | None = None,
     team_id: int | None = None,
+    opponent_team_id: int | None = None,
     season_id: int | None = None,
     place_id: int | None = None,
     date_from: date_ | None = None,
@@ -195,6 +231,7 @@ async def list_games(
     base_query = _filtered_games_query(
         player_id=player_id,
         team_id=team_id,
+        opponent_team_id=opponent_team_id,
         season_id=season_id,
         place_id=place_id,
         date_from=date_from,

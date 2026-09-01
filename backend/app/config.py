@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,6 +7,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "sqlite+aiosqlite:///./data/db/nhl_stats.db"
+    # Who (besides the admin, who can always edit/delete anything) may edit or
+    # delete a game: "everyone" (any logged-in member), "participants" (only
+    # the game's own two players), or "admin" (nobody but the admin).
+    game_edit_permission: Literal["everyone", "participants", "admin"] = "everyone"
+    # Days after a game is logged (Game.created_at) that it stays editable by
+    # non-admins under the permission level above; null/unset = no time limit.
+    game_edit_window_days: int | None = None
     jwt_secret: str = "dev-secret-change-me-in-production-please-thanks"
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 30

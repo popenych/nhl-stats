@@ -64,6 +64,7 @@ export interface Game {
   created_by_user_id: number
   home: GameSide
   away: GameSide
+  can_edit: boolean
 }
 
 export interface GameListItem {
@@ -73,6 +74,7 @@ export interface GameListItem {
   place: Place
   home: GameSide
   away: GameSide
+  can_edit: boolean
 }
 
 export interface GameListResponse {
@@ -169,6 +171,7 @@ export type MetricKey =
   | 'faceoff_pct'
   | 'powerplay_goals'
   | 'powerplay_total'
+  | 'powerplay_minutes_total_seconds'
   | 'powerplay_minutes_avg_seconds'
   | 'pp_pct'
   | 'penalty_minutes_total_seconds'
@@ -202,6 +205,7 @@ export interface StatsSummary {
   faceoff_pct: number
   powerplay_goals: number
   powerplay_total: number
+  powerplay_minutes_total_seconds: number
   powerplay_minutes_avg_seconds: number
   pp_pct: number
   penalty_minutes_total_seconds: number
@@ -304,11 +308,13 @@ export interface LeaderboardResponse {
 export interface PlayerSummaryRow {
   player: Player
   summary: StatsSummary
+  extras: PlayerExtras
 }
 
 export interface PlayerTeamSummaryRow {
   team: Team
   summary: StatsSummary
+  extras: TeamExtras | null
 }
 
 // Which side of the game a player/team was on — filters stats down to only

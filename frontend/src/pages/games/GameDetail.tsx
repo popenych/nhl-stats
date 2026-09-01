@@ -19,17 +19,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as gamesApi from '../../api/games'
 import type { Team } from '../../api/types'
-import { useAuth } from '../../auth/auth-context-value'
 import { TeamLogo } from '../../components/TeamLogo'
 import { formatDateDisplay } from '../../lib/date'
 import { formatMMSS } from '../../lib/time'
 
-const STAT_ROWS: {
+type StatRow = {
   label: string
   icon: ReactNode
   format: (v: number) => string
   key: string
-}[] = [
+}
+
+// Split around the "Powerplays" fraction row (rendered separately below,
+// since it combines two fields) so the full table matches the photo's
+// row order: shots, hits, time on attack, passing, faceoffs won, penalty
+// minutes, powerplays, powerplay minutes, shorthanded goals.
+const STAT_ROWS_BEFORE_POWERPLAYS: StatRow[] = [
   { label: 'Total shots', icon: <IconTarget size={14} />, key: 'shots', format: String },
   { label: 'Hits', icon: <IconBolt size={14} />, key: 'hits', format: String },
   {
@@ -51,6 +56,9 @@ const STAT_ROWS: {
     key: 'penalty_minutes_seconds',
     format: formatMMSS,
   },
+]
+
+const STAT_ROWS_AFTER_POWERPLAYS: StatRow[] = [
   {
     label: 'Powerplay minutes',
     icon: <IconClock size={14} />,
@@ -100,8 +108,6 @@ export function GameDetail() {
   const gameId = Number(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
-
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: () => gamesApi.getGame(gameId),
@@ -119,11 +125,6 @@ export function GameDetail() {
 
   if (isLoading || !game) return null
 
-  const canEdit =
-    user?.role === 'admin' ||
-    user?.player.id === game.home.player.id ||
-    user?.player.id === game.away.player.id
-
   function confirmDelete() {
     modals.openConfirmModal({
       title: 'Delete this game?',
@@ -140,7 +141,7 @@ export function GameDetail() {
         <Title order={2}>
           {game.away.player.name} vs {game.home.player.name} — {formatDateDisplay(game.date)}
         </Title>
-        {canEdit && (
+        {game.can_edit && (
           <Group>
             <Button component={Link} to={`/games/${game.id}/edit`} variant="light">
               Edit
@@ -190,7 +191,7 @@ export function GameDetail() {
                     {game.home.goals}
                   </Table.Td>
                 </Table.Tr>
-                {STAT_ROWS.map((row) => (
+                {STAT_ROWS_BEFORE_POWERPLAYS.map((row) => (
                   <Table.Tr key={row.key}>
                     <Table.Td>
                       {row.format(game.away[row.key as keyof typeof game.away] as number)}
@@ -214,6 +215,19 @@ export function GameDetail() {
                     {game.home.powerplay_goals}/{game.home.powerplay_total}
                   </Table.Td>
                 </Table.Tr>
+                {STAT_ROWS_AFTER_POWERPLAYS.map((row) => (
+                  <Table.Tr key={row.key}>
+                    <Table.Td>
+                      {row.format(game.away[row.key as keyof typeof game.away] as number)}
+                    </Table.Td>
+                    <Table.Td>
+                      <RowLabel icon={row.icon} text={row.label} />
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      {row.format(game.home[row.key as keyof typeof game.home] as number)}
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>

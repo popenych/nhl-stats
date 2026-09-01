@@ -11,21 +11,13 @@ import * as placesApi from '../../api/places'
 import * as playersApi from '../../api/players'
 import * as seasonsApi from '../../api/seasons'
 import * as teamsApi from '../../api/teams'
-import type { GameListItem } from '../../api/types'
-import { useAuth } from '../../auth/auth-context-value'
 import { GameResultCell } from '../../components/GameResultCell'
 import { TeamLogo } from '../../components/TeamLogo'
 import { formatDateDisplay } from '../../lib/date'
 
-function canDelete(userId: number | undefined, isAdmin: boolean, game: GameListItem) {
-  if (isAdmin) return true
-  return userId === game.home.player.id || userId === game.away.player.id
-}
-
 export function GamesList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [teamId, setTeamId] = useState<string | null>(null)
   const [seasonId, setSeasonId] = useState<string | null>(null)
@@ -160,7 +152,7 @@ export function GamesList() {
                   <Table.Td>{g.season.name}</Table.Td>
                   <Table.Td>{g.place.name}</Table.Td>
                   <Table.Td>
-                    {canDelete(user?.player.id, user?.role === 'admin', g) && (
+                    {g.can_edit && (
                       <ActionIcon
                         variant="subtle"
                         color="red"

@@ -245,6 +245,15 @@ export const STAT_FIELDS: StatField[] = [
     higherIsBetter: true,
   },
   {
+    key: 'powerplay_minutes_total_seconds',
+    metricKey: 'powerplay_minutes_total_seconds',
+    short: 'PP min total',
+    full: 'Power Play Minutes (total)',
+    icon: <IconClock size={14} />,
+    format: (s) => mmss(s.powerplay_minutes_total_seconds),
+    higherIsBetter: true,
+  },
+  {
     key: 'powerplay_minutes_avg_seconds',
     metricKey: 'powerplay_minutes_avg_seconds',
     short: 'PP min avg',
@@ -399,6 +408,7 @@ const COMPARE_TABLE_KEYS = [
   'passing_pct_avg',
   'faceoffs_won',
   'faceoff_pct',
+  'powerplay_minutes_total_seconds',
   'powerplay_minutes_avg_seconds',
   'pp',
   'pp_pct',

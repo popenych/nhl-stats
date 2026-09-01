@@ -180,6 +180,72 @@ async def test_list_games_filters_by_side(client: AsyncClient, db: AsyncSession)
     assert away_res.json()["items"][0]["away"]["player"]["name"] == "Alex"
 
 
+async def test_list_games_team_filter_requires_players_own_side(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """player_id + team_id together means "games where THIS player wore
+    THIS team" — not "games where this team appeared on either side",
+    which used to wrongly include games where only the opponent wore it."""
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    # alex wears home_team, friend wears away_team.
+    await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+
+    own_team = await client.get(
+        "/games", params={"player_id": alex.player_id, "team_id": ref["home_team_id"]}
+    )
+    opponents_team = await client.get(
+        "/games", params={"player_id": alex.player_id, "team_id": ref["away_team_id"]}
+    )
+
+    assert own_team.json()["total"] == 1
+    assert opponents_team.json()["total"] == 0
+
+
+async def test_list_games_filters_by_opponent_team(client: AsyncClient, db: AsyncSession) -> None:
+    """opponent_team_id matches the OTHER side's team — backs the player
+    page's "Team (opponent)" filter."""
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+
+    matches = await client.get(
+        "/games",
+        params={"player_id": alex.player_id, "opponent_team_id": ref["away_team_id"]},
+    )
+    no_matches = await client.get(
+        "/games",
+        params={"player_id": alex.player_id, "opponent_team_id": ref["home_team_id"]},
+    )
+
+    assert matches.json()["total"] == 1
+    assert no_matches.json()["total"] == 0
+
+
 async def test_create_game_renames_photo_to_descriptive_name(
     client: AsyncClient, db: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -217,9 +283,44 @@ async def test_create_game_renames_photo_to_descriptive_name(
     assert (tmp_path / new_photo_path).read_bytes() == b"fake jpeg bytes"
 
 
-async def test_non_participant_member_cannot_edit_game(
+async def test_non_participant_member_can_edit_game_under_default_everyone_policy(
     client: AsyncClient, db: AsyncSession
 ) -> None:
+    """Default policy (game_edit_permission="everyone") — any logged-in
+    member can edit any game, not just its two participants."""
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await _create_user(db, "outsider")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    create_res = await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+    game_id = create_res.json()["id"]
+    assert create_res.json()["can_edit"] is True
+
+    await client.post("/auth/logout")
+    await client.post("/auth/login", json={"username": "outsider", "password": "hunter2pass"})
+
+    get_res = await client.get(f"/games/{game_id}")
+    assert get_res.json()["can_edit"] is True
+
+    res = await client.patch(f"/games/{game_id}", json={"notes": "not hacked, just allowed"})
+    assert res.status_code == 200
+
+
+async def test_non_participant_member_cannot_edit_game_under_participants_policy(
+    client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "game_edit_permission", "participants")
     alex = await _create_user(db, "alex")
     friend = await _create_user(db, "friend")
     await _create_user(db, "outsider")
@@ -241,7 +342,100 @@ async def test_non_participant_member_cannot_edit_game(
     await client.post("/auth/logout")
     await client.post("/auth/login", json={"username": "outsider", "password": "hunter2pass"})
 
+    get_res = await client.get(f"/games/{game_id}")
+    assert get_res.json()["can_edit"] is False
+
     res = await client.patch(f"/games/{game_id}", json={"notes": "hacked"})
+    assert res.status_code == 403
+
+
+async def test_admin_policy_blocks_even_a_participant(
+    client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "game_edit_permission", "admin")
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    create_res = await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+    game_id = create_res.json()["id"]
+    # alex is a participant in their own just-created game, but the "admin"
+    # policy blocks everyone except the admin role, no exception for that.
+    assert create_res.json()["can_edit"] is False
+
+    res = await client.patch(f"/games/{game_id}", json={"notes": "still blocked"})
+    assert res.status_code == 403
+
+
+async def test_admin_can_always_edit_regardless_of_policy_or_window(
+    client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "game_edit_permission", "admin")
+    monkeypatch.setattr(settings, "game_edit_window_days", 7)
+    admin = await _create_user(db, "boss", role=UserRole.ADMIN)
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "boss", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    create_res = await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(admin.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+    assert create_res.json()["can_edit"] is True
+
+
+async def test_edit_window_blocks_editing_after_it_expires(
+    client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.models.game import Game
+
+    monkeypatch.setattr(settings, "game_edit_window_days", 7)
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    create_res = await client.post(
+        "/games",
+        json={
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/1.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+    game_id = create_res.json()["id"]
+    assert create_res.json()["can_edit"] is True
+
+    stale = datetime.now(UTC) - timedelta(days=8)
+    await db.execute(update(Game).where(Game.id == game_id).values(created_at=stale))
+    await db.commit()
+
+    get_res = await client.get(f"/games/{game_id}")
+    assert get_res.json()["can_edit"] is False
+
+    res = await client.patch(f"/games/{game_id}", json={"notes": "too late"})
     assert res.status_code == 403
 
 

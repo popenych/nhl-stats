@@ -12,3 +12,9 @@ export const STICKY_FIRST_COL: CSSProperties = {
   backgroundColor: 'var(--mantine-color-body)',
   borderRight: '2px solid var(--mantine-color-default-border)',
 }
+
+// Forces a column to size to its content on one line rather than wrapping
+// (e.g. a "records" cell with a team logo + abbreviation + GP/record text) —
+// pairs with Table.ScrollContainer, which is already how these wide tables
+// handle overflow, so a cramped column should scroll rather than squish.
+export const NOWRAP: CSSProperties = { whiteSpace: 'nowrap' }
