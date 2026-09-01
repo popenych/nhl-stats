@@ -7,6 +7,7 @@ from app.models.game import Game
 from app.models.game_side import GameSide, Side
 from app.models.user import User, UserRole
 from app.schemas.game import GameCreate, GameSideCreate, GameUpdate
+from app.services.photo_service import rename_photo, slugify
 
 
 class GameNotFoundError(Exception):
@@ -47,6 +48,37 @@ def _apply_side(side: GameSide, data: GameSideCreate) -> None:
     side.shorthanded_goals = data.shorthanded_goals
 
 
+def _descriptive_photo_stem(game: Game) -> str:
+    """Pure — no filesystem/DB side effects, so it's safe to call for a
+    dry-run preview (see scripts/rename_existing_game_photos.py). `game`
+    must have its away/home/season/place relationships loaded."""
+    return "_".join(
+        [
+            str(game.id),
+            slugify(game.away.player.name),
+            slugify(game.home.player.name),
+            str(game.date),
+            slugify(game.season.name),
+            slugify(game.place.name),
+        ]
+    )
+
+
+def _apply_descriptive_photo_name(game: Game) -> bool:
+    """Renames game.photo_path from its raw upload UUID to something
+    identifiable at a glance — photos are saved during OCR extraction,
+    before the real metadata is confirmed, so they can't get a good name
+    up front. Only called once the game's players/date/season/place are
+    known (i.e. after create, or after a photo is replaced on edit).
+    Actually renames the file on disk — returns whether game.photo_path
+    changed, so the caller knows to commit."""
+    new_path = rename_photo(game.photo_path, _descriptive_photo_stem(game))
+    if new_path == game.photo_path:
+        return False
+    game.photo_path = new_path
+    return True
+
+
 async def create_game(db: AsyncSession, data: GameCreate, created_by_user_id: int) -> Game:
     game = Game(
         date=data.date or date_.today(),
@@ -64,10 +96,17 @@ async def create_game(db: AsyncSession, data: GameCreate, created_by_user_id: in
 
     db.add(game)
     await db.commit()
+    game = await get_game(db, game.id)
+
+    if _apply_descriptive_photo_name(game):
+        await db.commit()
+
     return await get_game(db, game.id)
 
 
 async def update_game(db: AsyncSession, game: Game, data: GameUpdate) -> Game:
+    photo_replaced = data.photo_path is not None
+
     if data.date is not None:
         game.date = data.date
     if data.season_id is not None:
@@ -86,6 +125,15 @@ async def update_game(db: AsyncSession, game: Game, data: GameUpdate) -> Game:
         _apply_side(by_side[Side.AWAY], data.away)
 
     await db.commit()
+    game = await get_game(db, game.id)
+
+    # A freshly-uploaded replacement photo starts as a bare UUID again, same
+    # as at create time — give it a descriptive name too. Editing other
+    # fields (date, players, ...) without replacing the photo intentionally
+    # leaves an already-descriptive filename as-is.
+    if photo_replaced and _apply_descriptive_photo_name(game):
+        await db.commit()
+
     return await get_game(db, game.id)
 
 

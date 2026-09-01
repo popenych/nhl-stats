@@ -1,6 +1,10 @@
+from pathlib import Path
+
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.place import Place
 from app.models.season import Season
 from app.models.team import Team
@@ -167,17 +171,49 @@ async def test_list_games_filters_by_side(client: AsyncClient, db: AsyncSession)
         },
     )
 
-    home_res = await client.get(
-        "/games", params={"player_id": alex.player_id, "side": "home"}
-    )
-    away_res = await client.get(
-        "/games", params={"player_id": alex.player_id, "side": "away"}
-    )
+    home_res = await client.get("/games", params={"player_id": alex.player_id, "side": "home"})
+    away_res = await client.get("/games", params={"player_id": alex.player_id, "side": "away"})
 
     assert home_res.json()["total"] == 1
     assert home_res.json()["items"][0]["home"]["player"]["name"] == "Alex"
     assert away_res.json()["total"] == 1
     assert away_res.json()["items"][0]["away"]["player"]["name"] == "Alex"
+
+
+async def test_create_game_renames_photo_to_descriptive_name(
+    client: AsyncClient, db: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "photo_storage_dir", str(tmp_path))
+    old_path = tmp_path / "games" / "raw-uuid.jpg"
+    old_path.parent.mkdir(parents=True)
+    old_path.write_bytes(b"fake jpeg bytes")
+
+    alex = await _create_user(db, "alex")
+    friend = await _create_user(db, "friend")
+    await client.post("/auth/login", json={"username": "alex", "password": "hunter2pass"})
+    ref = await _seed_reference_data(db)
+
+    res = await client.post(
+        "/games",
+        json={
+            "date": "2026-03-14",
+            "season_id": ref["season_id"],
+            "place_id": ref["place_id"],
+            "photo_path": "games/raw-uuid.jpg",
+            "home": _side_payload(alex.player_id, ref["home_team_id"], goals=2),
+            "away": _side_payload(friend.player_id, ref["away_team_id"], goals=1),
+        },
+    )
+
+    assert res.status_code == 201
+    game_id = res.json()["id"]
+    new_photo_path = res.json()["photo_path"]
+    # slugify strips (not replaces) characters outside \w/hyphen, so the
+    # apostrophe in "Alex's place" is dropped rather than kept or hyphenated.
+    assert new_photo_path == f"games/{game_id}_Friend_Alex_2026-03-14_NHL-26_Alexs-place.jpg"
+    assert not old_path.exists()
+    assert (tmp_path / new_photo_path).exists()
+    assert (tmp_path / new_photo_path).read_bytes() == b"fake jpeg bytes"
 
 
 async def test_non_participant_member_cannot_edit_game(

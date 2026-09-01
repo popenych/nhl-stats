@@ -1,3 +1,4 @@
+import re
 import uuid
 from pathlib import Path
 
@@ -36,3 +37,34 @@ async def save_photo(upload_file: UploadFile, subdir: str) -> str:
     full_path.write_bytes(contents)
 
     return relative_path
+
+
+def slugify(text: str) -> str:
+    """Filesystem-friendly label for descriptive filenames — collapses
+    whitespace to hyphens and drops characters that are awkward in
+    filenames, but keeps non-ASCII names (e.g. Cyrillic) as-is rather than
+    transliterating or stripping them."""
+    text = text.strip()
+    text = re.sub(r"\s+", "-", text)
+    text = re.sub(r"[^\w\-]", "", text, flags=re.UNICODE)
+    return text or "x"
+
+
+def rename_photo(relative_path: str, new_stem: str) -> str:
+    """Renames an already-saved photo in place (same subdir, same
+    extension) to a more descriptive filename — game photos are saved
+    during OCR extraction, before the real metadata (players/date/season/
+    place) is confirmed, so they start out as a bare UUID and get renamed
+    once that's known. Returns the new relative path; a no-op (returns the
+    path unchanged) if the file isn't there to rename."""
+    old_path = Path(settings.photo_storage_dir) / relative_path
+    if not old_path.exists():
+        return relative_path
+
+    subdir = Path(relative_path).parent
+    new_relative_path = str(subdir / f"{new_stem}{old_path.suffix}")
+    new_path = Path(settings.photo_storage_dir) / new_relative_path
+    if new_path == old_path:
+        return relative_path
+    old_path.rename(new_path)
+    return new_relative_path

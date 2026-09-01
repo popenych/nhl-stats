@@ -27,6 +27,14 @@ mkdir -p "${LOCAL_BACKUP_DIR}"
 log "Snapshotting ${DB_PATH} -> ${snapshot_path}"
 sqlite3 "${DB_PATH}" ".backup '${snapshot_path}'"
 
+# Some WebDAV servers (Yandex Disk included, apparently) don't implicitly
+# create missing destination directories on copy/sync the way most rclone
+# backends do — mkdir is idempotent (a no-op if the directory already
+# exists), so it's safe to run unconditionally every time.
+log "Ensuring remote directories exist"
+rclone mkdir "${REMOTE}/db/"
+rclone mkdir "${REMOTE}/photos/"
+
 log "Uploading DB snapshot to ${REMOTE}/db/"
 rclone copy "${snapshot_path}" "${REMOTE}/db/" -v
 
