@@ -57,7 +57,7 @@ def _descriptive_photo_stem(game: Game) -> str:
             str(game.id),
             slugify(game.away.player.name),
             slugify(game.home.player.name),
-            str(game.date),
+            game.date.strftime("%d.%m.%Y"),  # matches the app's DD.MM.YYYY display format
             slugify(game.season.name),
             slugify(game.place.name),
         ]

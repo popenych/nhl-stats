@@ -210,7 +210,8 @@ async def test_create_game_renames_photo_to_descriptive_name(
     new_photo_path = res.json()["photo_path"]
     # slugify strips (not replaces) characters outside \w/hyphen, so the
     # apostrophe in "Alex's place" is dropped rather than kept or hyphenated.
-    assert new_photo_path == f"games/{game_id}_Friend_Alex_2026-03-14_NHL-26_Alexs-place.jpg"
+    # Date matches the app's DD.MM.YYYY display format, not the ISO input.
+    assert new_photo_path == f"games/{game_id}_Friend_Alex_14.03.2026_NHL-26_Alexs-place.jpg"
     assert not old_path.exists()
     assert (tmp_path / new_photo_path).exists()
     assert (tmp_path / new_photo_path).read_bytes() == b"fake jpeg bytes"
