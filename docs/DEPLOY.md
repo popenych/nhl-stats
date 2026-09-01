@@ -63,10 +63,11 @@ e.g. a VPN — already bound to 443 on the host). Check what's holding a port wi
 ## 5. Backups (optional but recommended)
 
 The `backup` sidecar pushes a SQLite snapshot + the photos directory to Yandex Disk via `rclone`,
-once immediately when the container starts and then every 24h from that moment (not a fixed
-wall-clock time — a restart resets the clock). An admin can also trigger one on demand from
-**Manage users → Run backup now** in the app; the backend touches a shared trigger file the
-backup container polls every ~30s (see `infra/backup/run.sh`).
+once a day at a fixed time — `BACKUP_HOUR`/`BACKUP_MINUTE` in `.env`, **UTC**, default 03:00.
+Convert from your local timezone yourself (e.g. 3am EEST/UTC+3 → `BACKUP_HOUR=0`). An admin can
+also trigger one on demand from **Manage users → Run backup now** in the app; the backend touches
+a shared trigger file the backup container polls every ~30s (see `infra/backup/run.sh`) — this
+doesn't affect the daily schedule.
 
 ```bash
 cp infra/rclone/rclone.conf.example infra/rclone/rclone.conf
@@ -139,7 +140,7 @@ Then spot-check the app in the browser to confirm the data looks right.
 
 | Task | Command |
 |---|---|
-| View logs | `docker compose logs -f backend` (or `frontend` / `caddy` / `backup`) |
+| View logs | `docker compose logs -f -t backend` (or `frontend` / `caddy` / `backup`) — `-t` prefixes every line with when Docker received it, useful for correlating log lines with when something actually happened |
 | Restart one service | `docker compose restart backend` |
 | Pull + redeploy after a `git push` to `main` | `git pull && docker compose up -d --build` |
 | Stop everything | `docker compose down` (keeps volumes — DB/photos survive) |
